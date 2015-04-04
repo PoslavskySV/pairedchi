@@ -224,7 +224,7 @@ class Setup implements AutoCloseable {
             massesSubs = 'm[charm] = mc'.t.hold & 'm[bottom] = mb'.t.hold
 
             /** Full simplification */
-            def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam & 'd^i_i = 4'.t & 'd^A_A = 8'.t
+            def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam & 'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 3".t
             fullSimplify = simplifyMetrics &
                     ExpandAll[simplifyMetrics] & simplifyMetrics &
                     leviSimplify &
@@ -332,18 +332,7 @@ class Setup implements AutoCloseable {
 
         use(Redberry) {
             spins = spins == null ? '' : spins
-            log "Simplifying matrix element $spins"
-            matrixElement <<= momentumConservation
-            matrixElement <<= fullSimplify & massesSubs & mFactor
-            matrixElement <<= 'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
-                    'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t
-            log('Matrix element size: ' + matrixElement.size())
-
-            println matrixElement[0]
-            println matrixElement[1]
-            println matrixElement[2]
-            println matrixElement[3]
-            println matrixElement[4]
+            log('Squaring matrix element (size: ' + matrixElement.size() + ')')
 
             def invert = { expr ->
                 (expr.indices.free.si % expr.indices.free.si.inverted) >> expr
@@ -385,10 +374,8 @@ class Setup implements AutoCloseable {
         def indexless = part.indexlessSubProduct
         def tensor = part.dataSubProduct
 
-
         println tensor
-        tensor <<= epsSum & fullSimplify &
-                uTrace & dTraceSimplify &
+        tensor <<= epsSum & uTrace & dTraceSimplify &
                 fullSimplify & massesSubs
 
         assert TensorUtils.isSymbolic(tensor)

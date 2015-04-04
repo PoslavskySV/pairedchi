@@ -28,8 +28,7 @@ import cc.redberry.groovy.Redberry
 import org.junit.Before
 import org.junit.Test
 
-import static cc.redberry.groovy.RedberryStatic.ExpandAll
-import static cc.redberry.groovy.RedberryStatic.Factor
+import static cc.redberry.groovy.RedberryStatic.*
 
 /**
  * Created by poslavsky on 02/04/15.
@@ -194,6 +193,27 @@ class SetupTest {
                         & Factor
                 ) >> temp
             }()) == 0.t
+        }
+    }
+
+    @Test
+    public void testPerformance() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(false, true)
+            def exprs = []
+            Setup.class.classLoader.getResourceAsStream('expressions').eachLine { l ->
+                exprs << l.t
+            }
+
+            println exprs[0]
+            timing {
+                for (int i = 0; i < exprs.size(); i++) {
+                    exprs[i] <<= stp.epsSum & stp.uTrace & stp.dTraceSimplify &
+                            stp.fullSimplify & stp.massesSubs
+                    assert TensorUtils.isSymbolic(exprs[i])
+                }
+            }
+
         }
     }
 }

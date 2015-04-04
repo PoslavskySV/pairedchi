@@ -121,6 +121,8 @@ class ChiBCC extends Setup {
             log "Setting up quak diagrams for $bottomSpin ..."
             def Mc = getQuarkDiagramsNotProjected()
             Mc <<= totalSpinProjector[bottomSpin]
+            if (bottomSpin == 'axial')
+                Mc <<= momentumConservation
             Mc <<= fullSimplify & massesSubs & mFactor & gcc & spinorsSimplify & massesSubs & mFactor
             log "... done"
             return (quarkDiagrams[bottomSpin] = Mc)

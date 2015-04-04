@@ -34,6 +34,7 @@ import static cc.redberry.core.context.OutputFormat.WolframMathematica
  */
 class ChiBChiC extends Setup {
     private def qVertices
+    private Map diagrams = [:]
 
     ChiBChiC() {
         super(true, true);
@@ -43,9 +44,10 @@ class ChiBChiC extends Setup {
     }
 
     Tensor setupFeynmanDiagrams(charmSpin, bottomSpin) {
+        if (diagrams[charmSpin + bottomSpin] != null)
+            return diagrams[charmSpin + bottomSpin]
+
         use(Redberry) {
-
-
             def simplify = FeynmanRules & qVertices & fullSimplify
             //first diagram
             def Ma = '1'.t
@@ -60,7 +62,10 @@ class ChiBChiC extends Setup {
             Mb *= simplify >> "eps2^b[h2] * A${charmSpin}_{dD bB}[charm, -k2_i + p_i[charm], k2_i]".t
 
             //total matrix element
-            Ma + Mb
+            def M = Ma + Mb
+            M <<= momentumConservation
+            M <<= fullSimplify & massesSubs & mFactor
+            return (diagrams[charmSpin + bottomSpin] = M)
         }
     }
 
