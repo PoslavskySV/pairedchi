@@ -166,7 +166,7 @@ class Setup implements AutoCloseable {
             momentums = [:]
             for (def fl in ['fl', 'charm', 'bottom']) { //for each flavour (`fl` denotes abstract flavour)
                 //quarks momentums in terms of quarkonia momentum (q_i is relative momentum)
-                momentums[fl] = 'p2_m[fl] = p_m[fl]/2 + q_m[fl]'.t.hold & 'p1_m[fl] = p_m[fl]/2 - q_m[fl]'.t.hold
+                momentums[fl] = "p2_m[$fl] = p_m[$fl]/2 + q_m[$fl]".t.hold & "p1_m[$fl] = p_m[$fl]/2 - q_m[$fl]".t.hold
 
                 // set spin singlet projection
                 spinSingletProjector[fl] = "v[p2_m[$fl]]*cu[p1_m[$fl]] = (p2_m[$fl]*G^m - m[$fl]) * epsS_m[$fl] * G^m * (p1_m[$fl]*G^m + m[$fl])".t
@@ -182,7 +182,7 @@ class Setup implements AutoCloseable {
                 epsSum &= "eps_ab[h[$fl]]*eps_cd[h[$fl]] = J_abcd[p_a[$fl], 2*m[$fl]]".t
 
                 // spinor sums
-                epsSum &= "v[p2_m[$fl]]*cu[p2_m[$fl]] = -m[$fl] + p2^m[$fl]*G_m".t
+                epsSum &= "v[p2_m[$fl]]*cu[p2_m[$fl]] = m[$fl] + p2^m[$fl]*G_m".t
                 epsSum &= "v[p1_m[$fl]]*cu[p1_m[$fl]] = m[$fl] + p1^m[$fl]*G_m".t
 
                 conjugateSpinors &= "v[p2_m[$fl]]*cu[p1_m[$fl]] = v[p1_m[$fl]]*cu[p2_m[$fl]]".t
@@ -335,8 +335,15 @@ class Setup implements AutoCloseable {
             log "Simplifying matrix element $spins"
             matrixElement <<= momentumConservation
             matrixElement <<= fullSimplify & massesSubs & mFactor
+            matrixElement <<= 'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
+                    'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t
             log('Matrix element size: ' + matrixElement.size())
 
+            println matrixElement[0]
+            println matrixElement[1]
+            println matrixElement[2]
+            println matrixElement[3]
+            println matrixElement[4]
 
             def invert = { expr ->
                 (expr.indices.free.si % expr.indices.free.si.inverted) >> expr
@@ -378,8 +385,10 @@ class Setup implements AutoCloseable {
         def indexless = part.indexlessSubProduct
         def tensor = part.dataSubProduct
 
-        tensor <<= epsSum &
-                dTraceSimplify & uTrace &
+
+        println tensor
+        tensor <<= epsSum & fullSimplify &
+                uTrace & dTraceSimplify &
                 fullSimplify & massesSubs
 
         assert TensorUtils.isSymbolic(tensor)

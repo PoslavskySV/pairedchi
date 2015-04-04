@@ -29,8 +29,7 @@ import cc.redberry.groovy.Redberry
 
 import static cc.redberry.core.context.OutputFormat.Maple
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
-import static cc.redberry.groovy.RedberryStatic.EliminateMetrics
-import static cc.redberry.groovy.RedberryStatic.ExpandAll
+import static cc.redberry.groovy.RedberryStatic.*
 
 /**
  * Created by poslavsky on 03/04/15.
@@ -38,11 +37,93 @@ import static cc.redberry.groovy.RedberryStatic.ExpandAll
 class ChiBCC extends Setup {
     private def qVertices, ccVertex
 
+    private Map quarkDiagrams = [:]
+    private Map gluonDiagrams = [:]
+    private Tensor quarkDiagramsNotProjected = null;
+    private Tensor gcc = null;
+
+    private Transformation spinorsSimplify
+
     ChiBCC() {
         super(false, true);
         use(Redberry) {
             qVertices = effectiveQuarkoniaVertices().values() as Transformation
             ccVertex = effectivePairVertex()
+            spinorsSimplify = Identity
+            spinorsSimplify &= 'cu[p1_m[charm]]*G_a*p1^a[charm] = m[charm]*cu[p1_m[charm]]'.t
+            spinorsSimplify &= 'G_a*p2^a[charm]*v[p2_m[charm]] = m[charm]*v[p2_m[charm]]'.t
+        }
+    }
+
+    Tensor getGluonDiagrams(bottomSpin) {
+        if (gluonDiagrams[bottomSpin] != null)
+            return gluonDiagrams[bottomSpin]
+        use(Redberry) {
+
+            def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
+            //first diagram
+            def Ma = '1'.t
+            Ma *= simplify >> "eps1^a[h1] * B_{aA cC}[charm, k1_i, -k1_i + p1_i[charm] + p2_i[charm]]".t
+            Ma *= simplify >> 'G^cd[k1_i - p1_i[charm] - p2_i[charm]] * g^CD'.t
+            Ma *= simplify >> "eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
+
+            //second diagram
+            def Mb = '1'.t
+            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]]".t
+            Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
+            Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
+
+            def M = Ma + Mb
+            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+            return (gluonDiagrams[bottomSpin] = M)
+        }
+    }
+
+
+    Tensor getQuarkDiagramsNotProjected() {
+        if (quarkDiagramsNotProjected != null)
+            return quarkDiagramsNotProjected
+
+        use(Redberry) {
+            gcc = 'Vcc_iI = cu[p1_m[charm]]*G_i*T_I*v[p2_m[charm]]'.t
+
+            quarkDiagramsNotProjected = '0'.t
+            // (1,2,3)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
+            // (3,2,1)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_bB*eps2^b[h2]*D[-pCharm_m - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
+            // (1,3,2)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_cC*Vcc^cC*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
+            // (3,1,2)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_aA*eps1^a[h1]*D[-pCharm_m - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
+            // (2,3,1)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_cC*Vcc^cC*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
+            // (2,1,3)
+            quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_aA*eps1^a[h1]*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
+
+
+            def masses = 'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t & 'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+            quarkDiagramsNotProjected <<= 'pCharm_m = p1_m[charm] + p2_m[charm]'.t
+            quarkDiagramsNotProjected <<= FeynmanRules & spinSingletProjector['bottom']
+            quarkDiagramsNotProjected <<= dTraceSimplify & uTrace
+            quarkDiagramsNotProjected <<= masses
+            quarkDiagramsNotProjected <<= momentums['bottom']
+            quarkDiagramsNotProjected <<= 'q_i[bottom] = q_i'.t.hold & taylor('q_i') & 'q_i = q_i[bottom]'.t
+            quarkDiagramsNotProjected <<= mandelstam & ExpandAll[EliminateMetrics & mandelstam]
+            return quarkDiagramsNotProjected
+        }
+    }
+
+    Tensor getQuarkDiagrams(String bottomSpin) {
+        if (quarkDiagrams[bottomSpin] != null)
+            return quarkDiagrams[bottomSpin]
+        use(Redberry) {
+            log "Setting up quak diagrams for $bottomSpin ..."
+            def Mc = getQuarkDiagramsNotProjected()
+            Mc <<= totalSpinProjector[bottomSpin]
+            Mc <<= fullSimplify & massesSubs & mFactor & gcc & spinorsSimplify & massesSubs & mFactor
+            log "... done"
+            return (quarkDiagrams[bottomSpin] = Mc)
         }
     }
 
@@ -63,68 +144,37 @@ class ChiBCC extends Setup {
             Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
             Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
 
-            def Mc = mc(bottomSpin)
+            def Mc = getQuarkDiagrams(bottomSpin)
 
             def M = Ma + Mb + Mc
-            M <<= 'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
-                    'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t
+            M <<= 'cu[p1_a[charm]]*p1_a[charm]*G^a = -m[charm]*cu[p1_a[charm]]'.t &
+                    'p2_a[charm]*G^a*v[p2_a[charm]] = m[charm]*v[p2_a[charm]]'.t
 
             return M
         }
     }
 
-    Tensor mc(bottomSpin) {
-        use(Redberry) {
-            log "Setting up Mc for $bottomSpin"
-
-            def Mc = '0'.t
-            def gcc = 'Vcc_iI = cu[p1_m[charm]]*G_i*T_I*v[p2_m[charm]]'.t
-            // (1,2,3)
-            Mc += 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + p1_m[charm] + p2_m[charm], m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
-            // (3,2,1)
-            Mc += 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_bB*eps2^b[h2]*D[-(p1_m[charm] + p2_m[charm]) - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
-            // (1,3,2)
-            Mc += 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_cC*Vcc^cC*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
-            // (3,1,2)
-            Mc += 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_aA*eps1^a[h1]*D[-(p1_m[charm] + p2_m[charm]) - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
-            // (2,3,1)
-            Mc += 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_cC*Vcc^cC*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
-            // (2,1,3)
-            Mc += 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + (p1_m[charm] + p2_m[charm]), m[bottom]]*V_aA*eps1^a[h1]*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
-            Mc <<= FeynmanRules & momentums['bottom']
-
-            println TensorUtils.getAllDiffSimpleTensors(Mc)
-
-            // Taylor expansion (scalar meson)
-            Mc <<= spinSingletProjector['bottom'] &
-                    'q_i[bottom] = q_i'.t.hold & taylor('q_i') & 'q_i = q_i[bottom]'.t &
-                    ExpandAll[EliminateMetrics] &
-                    totalSpinProjector[bottomSpin] &
-                    fullSimplify & gcc
-            return Mc
-        }
+    Tensor calculateSquaredMatrixElement(String bottomSpin) {
+        squareMatrixElement(setupFeynmanDiagrams(bottomSpin), "bottom: $bottomSpin")
     }
 
-    void calculateAll() {
-        def filePath = '/Users/poslavsky/Projects/redberry/redberry-groovy-scripts/src/main/groovy/cc/redberry/groovy/scripts/feyncalc/qcd/pairedChi/ChiBCC.m'
-        File file = new File(filePath)
+    void calculateAllProcesses(String output) {
+        File file = new File(output)
         if (file.exists()) {
             file.delete();
-            file = new File(filePath)
+            file = new File(output)
         }
-        File fileMaple = new File('/Users/poslavsky/Projects/redberry/redberry-groovy-scripts/src/main/groovy/cc/redberry/groovy/scripts/feyncalc/qcd/pairedChi/ChiBCC_maple.m')
+        File fileMaple = new File(output)
 
         use(Redberry) {
-//            , 'axial', 'tensor'
-            for (def bottomSpin in ['scalar']) {
-                def diagram = setupFeynmanDiagrams(bottomSpin)
-                def squared = squareMatrixElement(diagram, "bottom: $bottomSpin")
+
+            for (def bottomSpin in ['scalar', 'axial', 'tensor']) {
+                def squared = calculateSquaredMatrixElement(bottomSpin)
 
 
                 assert TensorUtils.isSymbolic(squared)
 
                 def toStr = [scalar: 0, axial: 1, tensor: 2]
-//                wolframFactorTr >>
                 def stringResult = (squared).toString(WolframMathematica)
                 file << "chiB${toStr[bottomSpin]}cc = ${stringResult};"
                 file << "\n"
