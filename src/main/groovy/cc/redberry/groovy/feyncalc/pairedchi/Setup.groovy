@@ -93,8 +93,8 @@ class Setup implements AutoCloseable {
             //Setting up matrix objects
             defineMatrices 'T_A', Matrix2.matrix,//unitary matrices
                     'G_a', 'G5', Matrix1.matrix, //gamma matrices
-                    'v[p_a]', Matrix1.vector, Matrix2.vector, //final quark wave function
-                    'cu[p_a]', Matrix1.covector, Matrix2.covector, //final antiquark wave function
+                    'v[p_a]', 'u[p_a]', Matrix1.vector, Matrix2.vector, //final quark wave function
+                    'cu[p_a]', 'cv[p_a]', Matrix1.covector, Matrix2.covector, //final antiquark wave function
                     'V_iA', Matrix1.matrix, Matrix2.matrix, //quark-gluon vertex
                     'D[p_m, mass]', Matrix1.matrix //quark propagator
 
@@ -182,10 +182,10 @@ class Setup implements AutoCloseable {
                 epsSum &= "eps_ab[h[$fl]]*eps_cd[h[$fl]] = J_abcd[p_a[$fl], 2*m[$fl]]".t
 
                 // spinor sums
-                epsSum &= "v[p2_m[$fl]]*cu[p2_m[$fl]] = m[$fl] + p2^m[$fl]*G_m".t
-                epsSum &= "v[p1_m[$fl]]*cu[p1_m[$fl]] = m[$fl] + p1^m[$fl]*G_m".t
+                epsSum &= "u[p1_m[$fl]]*cu[p1_m[$fl]] = m[$fl] + p1^m[$fl]*G_m".t
+                epsSum &= "v[p2_m[$fl]]*cv[p2_m[$fl]] = -m[$fl] + p2^m[$fl]*G_m".t
 
-                conjugateSpinors &= "v[p2_m[$fl]]*cu[p1_m[$fl]] = v[p1_m[$fl]]*cu[p2_m[$fl]]".t
+                conjugateSpinors &= "v[p2_m[$fl]]*cu[p1_m[$fl]] = u[p1_m[$fl]]*cv[p2_m[$fl]]".t
             }
 
             //sum over polarizations for gluons
@@ -267,7 +267,7 @@ class Setup implements AutoCloseable {
             def A = 'cu[p1_m[fl]]*(V_aA*D[p1_m[fl] - k1_m, m[fl]]*V_bB + V_bB*D[p1_m[fl] - k2_m, m[fl]]*V_aA)*v[p2_m[fl]]'.t
             // basic simplifications
             A <<= FeynmanRules & spinSingletProjector['fl'] &
-                    dTrace & uTrace & momentums['fl'] &
+                    dTrace & ExpandAndEliminate & uTrace & momentums['fl'] &
                     ExpandAll[EliminateMetrics] & EliminateMetrics &
                     'p_m[fl]*p^m[fl] = (2*m[fl])**2'.t
 
@@ -371,15 +371,20 @@ class Setup implements AutoCloseable {
     }
 
     Tensor calcProduct(Product part) {
-        def indexless = part.indexlessSubProduct
-        def tensor = part.dataSubProduct
+        use(Redberry) {
+            def indexless = part.indexlessSubProduct
+            def tensor = part.dataSubProduct
 
-        println tensor
-        tensor <<= epsSum & uTrace & dTraceSimplify &
-                fullSimplify & massesSubs
+            tensor <<= epsSum & uTrace & mandelstam & dTraceSimplify &
+                    fullSimplify & massesSubs & uSimplify
 
-        assert TensorUtils.isSymbolic(tensor)
-        return indexless * tensor
+            tensor <<= 'I = 0'.t
+
+            //uTrace & uSimplify
+
+            assert TensorUtils.isSymbolic(tensor)
+            return indexless * tensor
+        }
     }
 
     void log(String msg) {

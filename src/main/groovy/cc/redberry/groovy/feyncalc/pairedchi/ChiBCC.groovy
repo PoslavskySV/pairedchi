@@ -42,7 +42,7 @@ class ChiBCC extends Setup {
     private Tensor quarkDiagramsNotProjected = null;
     private Tensor gcc = null;
 
-    private Transformation spinorsSimplify
+    private Transformation spinorsSimplify, dSimplify
 
     ChiBCC() {
         super(false, true);
@@ -51,7 +51,11 @@ class ChiBCC extends Setup {
             ccVertex = effectivePairVertex()
             spinorsSimplify = Identity
             spinorsSimplify &= 'cu[p1_m[charm]]*G_a*p1^a[charm] = m[charm]*cu[p1_m[charm]]'.t
-            spinorsSimplify &= 'G_a*p2^a[charm]*v[p2_m[charm]] = m[charm]*v[p2_m[charm]]'.t
+            spinorsSimplify &= 'G_a*p2^a[charm]*v[p2_m[charm]] = -m[charm]*v[p2_m[charm]]'.t
+            dSimplify = Identity
+            dSimplify &= 'G_a*G^a = 4'.t
+            dSimplify &= 'G_a*G_b*G^a = -2*G_b'.t
+            dSimplify &= 'G_a*G_b*G_c*G^a = 4*g_bc'.t
         }
     }
 
@@ -59,7 +63,7 @@ class ChiBCC extends Setup {
         if (gluonDiagrams[bottomSpin] != null)
             return gluonDiagrams[bottomSpin]
         use(Redberry) {
-
+            log "Setting up gluon diagrams for $bottomSpin ..."
             def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
             //first diagram
             def Ma = '1'.t
@@ -75,6 +79,8 @@ class ChiBCC extends Setup {
 
             def M = Ma + Mb
             M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+
+            log "... done"
             return (gluonDiagrams[bottomSpin] = M)
         }
     }
@@ -105,11 +111,11 @@ class ChiBCC extends Setup {
             def masses = 'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t & 'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
             quarkDiagramsNotProjected <<= 'pCharm_m = p1_m[charm] + p2_m[charm]'.t
             quarkDiagramsNotProjected <<= FeynmanRules & spinSingletProjector['bottom']
-            quarkDiagramsNotProjected <<= dTraceSimplify & uTrace
+            quarkDiagramsNotProjected <<= dTraceSimplify
             quarkDiagramsNotProjected <<= masses
             quarkDiagramsNotProjected <<= momentums['bottom']
             quarkDiagramsNotProjected <<= 'q_i[bottom] = q_i'.t.hold & taylor('q_i') & 'q_i = q_i[bottom]'.t
-            quarkDiagramsNotProjected <<= mandelstam & ExpandAll[EliminateMetrics & mandelstam]
+            quarkDiagramsNotProjected <<= mandelstam & ExpandAll[EliminateMetrics & mandelstam] & uTrace & EliminateMetrics
             return quarkDiagramsNotProjected
         }
     }
@@ -118,12 +124,13 @@ class ChiBCC extends Setup {
         if (quarkDiagrams[bottomSpin] != null)
             return quarkDiagrams[bottomSpin]
         use(Redberry) {
-            log "Setting up quak diagrams for $bottomSpin ..."
+            log "Setting up quark diagrams for $bottomSpin ..."
             def Mc = getQuarkDiagramsNotProjected()
             Mc <<= totalSpinProjector[bottomSpin]
             if (bottomSpin == 'axial')
                 Mc <<= momentumConservation
-            Mc <<= fullSimplify & massesSubs & mFactor & gcc & spinorsSimplify & massesSubs & mFactor
+            Mc <<= fullSimplify & massesSubs & mFactor & gcc
+            Mc <<= spinorsSimplify & massesSubs & mFactor
             log "... done"
             return (quarkDiagrams[bottomSpin] = Mc)
         }
