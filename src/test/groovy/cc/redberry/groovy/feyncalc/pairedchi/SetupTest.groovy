@@ -108,7 +108,7 @@ class SetupTest {
      * Testing Ward identities
      */
     @Test
-    public void testEffectiveVertex3() {
+    public void testEffectiveVerticesWard() {
         use(Redberry) {
 
             def stp = new Setup(true)
@@ -146,9 +146,8 @@ class SetupTest {
      * Testing Ward identities
      */
     @Test
-    public void testEffectiveVertex4() {
+    public void testEffectivePairVertexWard() {
         use(Redberry) {
-
             def stp = new Setup(false)
             def vertex = stp.effectivePairVertex()
 
@@ -158,17 +157,27 @@ class SetupTest {
 
             // Ward identities
             def tr = stp.fullSimplify &
-                    'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
-                    'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t &
-                    'v[p2_a[charm]] * cu[p1_a[charm]] = 1'.t &
+                    //'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
+                    //'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t &
+                    //'v[p2_a[charm]] * cu[p1_a[charm]] = 1'.t &
                     stp.dTrace & stp.uTrace & stp.fullSimplify &
                     stp.massesSubs &
-                    Factor
+                    stp.mFactor
 
             def temp
 
             temp = vertex >> "k1^a*B_{aA bB}[charm, k1_i, k2_i]".t
+            temp *= 'I'.t
             temp <<= 'k1_a = p1_a[charm] + p2_a[charm] - k2_a'.t & tr
+            temp <<= 'G_a = g_a'.t & 'T_A = t_A'.t & EliminateMetrics & 'cu[p1_m[charm]] * v[p2_m[charm]] = cu*v'.t & EliminateMetrics
+            temp <<= 'g_a*g^a = 1'.t
+            temp <<= tr
+            temp <<= 'cu*p1_a[charm]*g^a = m[charm]*cu '.t &
+                    'p2_a[charm]*g^a*v = -m[charm]*v '.t
+            temp <<= tr
+
+            println temp
+
             assert temp == 0.t
 
             temp = vertex >> "k2^b*B_{aA bB}[charm, k1_i, k2_i]".t

@@ -50,7 +50,7 @@ class Setup implements AutoCloseable {
     final boolean log
 
     /** Feynman rules and auxiliary tensors */
-    public def J2, J4, V, D, G, V3, FeynmanRules
+    public def J2, J4, PS, V, D, G, V3, FeynmanRules
 
     /** Spin projectors and polarisation sums */
 
@@ -131,14 +131,21 @@ class Setup implements AutoCloseable {
     void setupFeynRules() {
         log 'Setting up Feynman rules'
         use(Redberry) {
+            if (projectCC)
+                PS = 'PS_mn[k_a] = -g_mn'.t
+            else {
+                PS = 'PS_mn[k_a] = -g_mn + (k_m*n_n + k_n*n_m)/(k_a*n^a) + k_m*k_n/(k_a*n^a)**2*n_a*n^a'.t
+                //particular n
+                PS <<= 'n_a = p_a[bottom]'.t
+            }
             //Quark vertex
-            V = 'V_mA := I*g*G_m*T_A'.t
+            V = 'V_mA = I*g*G_m*T_A'.t
             //Quark propagator
-            D = 'D[p_m, mass] := I*(mass + p_m*G^m)/(p_m*p^m - mass**2)'.t
+            D = 'D[p_m, mass] = I*(mass + p_m*G^m)/(p_m*p^m - mass**2)'.t
             //Gluon propagator
-            G = 'G_mn[k_a] := -I*g_mn/(k_a*k^a)'.t
+            G = PS >> 'G_mn[k_a] = -I*PS_mn[k_a]/(k_a*k^a)'.t
             //3-gluon vertex
-            V3 = ('V_{Aa Bb Cc}[k1_m, k2_m, k3_m] :=' +
+            V3 = ('V_{Aa Bb Cc}[k1_m, k2_m, k3_m] =' +
                     'g*f_{ABC}*(g_ab*(k1_c - k2_c) + g_bc*(k2_a - k3_a) + g_ca*(k3_b - k1_b))').t
             //All Feynman rules in one transformation
             FeynmanRules = V & D & G & V3
@@ -189,8 +196,8 @@ class Setup implements AutoCloseable {
             }
 
             //sum over polarizations for gluons
-            epsSum &= 'eps1_a[h1]*eps1_b[h1] = -g_ab'.t
-            epsSum &= 'eps2_a[h2]*eps2_b[h2] = -g_ab'.t
+            epsSum &= PS >> 'eps1_a[h1]*eps1_b[h1] = PS_ab[k1_a]'.t
+            epsSum &= PS >> 'eps2_a[h2]*eps2_b[h2] = PS_ab[k2_a]'.t
         }
     }
 
@@ -207,7 +214,7 @@ class Setup implements AutoCloseable {
             leviSimplify = LeviCivitaSimplify.minkowski['e_abcd']
 
             //Mandelstam variables and mass shell
-            if (this.projectCC)
+            if (projectCC)
                 mandelstam = setMandelstam([k1_m: '0', k2_m: '0', 'p_m[charm]': '2*m[charm]', 'p_m[bottom]': '2*m[bottom]'])
             else
                 mandelstam = setMandelstam5([k1_m: '0', k2_m: '0', 'p1_m[charm]': 'm[charm]', 'p2_m[charm]': 'm[charm]', 'p_m[bottom]': '2*m[bottom]'])
@@ -224,7 +231,9 @@ class Setup implements AutoCloseable {
             massesSubs = 'm[charm] = mc'.t.hold & 'm[bottom] = mb'.t.hold
 
             /** Full simplification */
-            def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam & 'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 3".t
+            def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam &
+                    'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 4".t & "d^A'_A' = 3".t
+
             fullSimplify = simplifyMetrics &
                     ExpandAll[simplifyMetrics] & simplifyMetrics &
                     leviSimplify &

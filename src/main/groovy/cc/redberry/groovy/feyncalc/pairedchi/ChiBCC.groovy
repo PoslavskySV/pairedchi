@@ -39,6 +39,7 @@ class ChiBCC extends Setup {
 
     private Map quarkDiagrams = [:]
     private Map gluonDiagrams = [:]
+    private Map gluon3Diagrams = [:]
     private Tensor quarkDiagramsNotProjected = null;
     private Tensor gcc = null;
 
@@ -56,9 +57,10 @@ class ChiBCC extends Setup {
             dSimplify &= 'G_a*G^a = 4'.t
             dSimplify &= 'G_a*G_b*G^a = -2*G_b'.t
             dSimplify &= 'G_a*G_b*G_c*G^a = 4*g_bc'.t
+            gcc = 'Vcc_iI = cu[p1_m[charm]]*V_iI*v[p2_m[charm]]'.t << FeynmanRules
+
         }
     }
-
     Tensor getGluonDiagrams(bottomSpin) {
         if (gluonDiagrams[bottomSpin] != null)
             return gluonDiagrams[bottomSpin]
@@ -84,14 +86,63 @@ class ChiBCC extends Setup {
             return (gluonDiagrams[bottomSpin] = M)
         }
     }
+//
+//    Tensor getGluonDiagrams(bottomSpin) {
+//        if (gluonDiagrams[bottomSpin] != null)
+//            return gluonDiagrams[bottomSpin]
+//        use(Redberry) {
+//            log "Setting up gluon diagrams for $bottomSpin ..."
+//            def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
+//
+//            def Ma = '1'.t
+//            Ma *= simplify >> "eps1^a[h1] * B_{aA cC}[charm, k1_i, -k1_i + p1_i[charm] + p2_i[charm]]".t
+//            Ma *= simplify >> 'G^cd[k1_i - p1_i[charm] - p2_i[charm]] * g^CD'.t
+//            Ma *= simplify >> "eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
+//
+//            //second diagram
+//            def Mb = '1'.t
+//            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]]".t
+//            Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
+//            Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
+//            def M = Ma + Mb
+//            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+//
+//            log '...done'
+//            return (gluonDiagrams[bottomSpin] = M)
+//        }
+//    }
 
+    Tensor get3GluonDiagrams(bottomSpin) {
+        if (gluon3Diagrams[bottomSpin] != null)
+            return gluon3Diagrams[bottomSpin]
+        use(Redberry) {
+            log "Setting up 3-gluon diagrams for $bottomSpin ..."
+            def simplify = FeynmanRules & gcc & qVertices & ccVertex & fullSimplify
+            //first diagram
+            def Ma = '1'.t
+            Ma *= simplify >> "eps1^a[h1] * Vcc^cC * V_{cC aA dD}[-p1_a[charm] - p2_a[charm], k1_a, k2_a - p_a[bottom]]".t
+            Ma *= simplify >> "G^ed[-k2_a + p_a[bottom]]*g^ED".t
+            Ma *= simplify >> "A${bottomSpin}_{eE bB}[bottom, -k2_a + p_a[bottom], k2_a] * eps2^b[h2]".t
+
+            //second diagram
+            def Mb = '1'.t
+            Mb *= simplify >> "eps2^b[h2] * Vcc^cC * V_{cC bB dD}[-p1_a[charm] - p2_a[charm], k2_a, k1_a - p_a[bottom]]".t
+            Mb *= simplify >> "G^ed[-k1_a + p_a[bottom]]*g^ED".t
+            Mb *= simplify >> "A${bottomSpin}_{eE aA}[bottom, -k1_a + p_a[bottom], k1_a] * eps1^a[h1]".t
+
+            def M = Ma + Mb
+            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+
+            log "... done"
+            return (gluon3Diagrams[bottomSpin] = M)
+        }
+    }
 
     Tensor getQuarkDiagramsNotProjected() {
         if (quarkDiagramsNotProjected != null)
             return quarkDiagramsNotProjected
 
         use(Redberry) {
-            gcc = 'Vcc_iI = cu[p1_m[charm]]*G_i*T_I*v[p2_m[charm]]'.t
 
             quarkDiagramsNotProjected = '0'.t
             // (1,2,3)
