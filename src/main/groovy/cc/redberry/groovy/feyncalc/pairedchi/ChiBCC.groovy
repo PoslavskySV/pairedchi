@@ -27,8 +27,6 @@ import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 
-import static cc.redberry.core.context.OutputFormat.Maple
-import static cc.redberry.core.context.OutputFormat.WolframMathematica
 import static cc.redberry.groovy.RedberryStatic.*
 
 /**
@@ -44,9 +42,15 @@ class ChiBCC extends Setup {
     private Tensor gcc = null;
 
     private Transformation spinorsSimplify, dSimplify
+    private Transformation assumptions
 
     ChiBCC() {
+        this(Identity)
+    }
+
+    ChiBCC(assumptions) {
         super(false, true);
+        this.assumptions = assumptions
         use(Redberry) {
             qVertices = effectiveQuarkoniaVertices().values() as Transformation
             ccVertex = effectivePairVertex()
@@ -57,27 +61,29 @@ class ChiBCC extends Setup {
             dSimplify &= 'G_a*G^a = 4'.t
             dSimplify &= 'G_a*G_b*G^a = -2*G_b'.t
             dSimplify &= 'G_a*G_b*G_c*G^a = 4*g_bc'.t
-            gcc = 'Vcc_iI = cu[p1_m[charm]]*V_iI*v[p2_m[charm]]'.t << FeynmanRules
 
+            gcc = 'Vcc_iI = G_ij[p1_m[charm] + p2_m[charm]]*cu[p1_m[charm]]*V^j_I*v[p2_m[charm]]'.t
+            gcc <<= FeynmanRules & fullSimplify
         }
     }
+
     Tensor getGluonDiagrams(bottomSpin) {
         if (gluonDiagrams[bottomSpin] != null)
             return gluonDiagrams[bottomSpin]
         use(Redberry) {
             log "Setting up gluon diagrams for $bottomSpin ..."
-            def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
+            def simplify = assumptions & FeynmanRules & qVertices & ccVertex & fullSimplify
             //first diagram
-            def Ma = '1'.t
-            Ma *= simplify >> "eps1^a[h1] * B_{aA cC}[charm, k1_i, -k1_i + p1_i[charm] + p2_i[charm]]".t
-            Ma *= simplify >> 'G^cd[k1_i - p1_i[charm] - p2_i[charm]] * g^CD'.t
+            def Ma = 1.t
+            Ma *= simplify >> 'eps1^a[h1] * B_{aA cC}[charm, k1_i, k2_i - p_i[bottom]]'.t
+            Ma *= simplify >> 'G^cd[-k2_i + p_i[bottom]] * g^CD'.t
             Ma *= simplify >> "eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
 
             //second diagram
-            def Mb = '1'.t
-            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]]".t
-            Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
-            Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
+            def Mb = 1.t
+            Mb *= simplify >> 'eps2^b[h2] * B_{bB cC}[charm, k2_i, k1_i - p_i[bottom]]'.t
+            Mb *= simplify >> 'G^cd[-k1_i + p_i[bottom]] * g^CD'.t
+            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{dD aA}[bottom, -k1_i + p_i[bottom], k1_i]".t
 
             def M = Ma + Mb
             M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
@@ -86,52 +92,42 @@ class ChiBCC extends Setup {
             return (gluonDiagrams[bottomSpin] = M)
         }
     }
-//
-//    Tensor getGluonDiagrams(bottomSpin) {
-//        if (gluonDiagrams[bottomSpin] != null)
-//            return gluonDiagrams[bottomSpin]
-//        use(Redberry) {
-//            log "Setting up gluon diagrams for $bottomSpin ..."
-//            def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
-//
-//            def Ma = '1'.t
-//            Ma *= simplify >> "eps1^a[h1] * B_{aA cC}[charm, k1_i, -k1_i + p1_i[charm] + p2_i[charm]]".t
-//            Ma *= simplify >> 'G^cd[k1_i - p1_i[charm] - p2_i[charm]] * g^CD'.t
-//            Ma *= simplify >> "eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
-//
-//            //second diagram
-//            def Mb = '1'.t
-//            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]]".t
-//            Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
-//            Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
-//            def M = Ma + Mb
-//            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
-//
-//            log '...done'
-//            return (gluonDiagrams[bottomSpin] = M)
-//        }
-//    }
 
     Tensor get3GluonDiagrams(bottomSpin) {
         if (gluon3Diagrams[bottomSpin] != null)
             return gluon3Diagrams[bottomSpin]
         use(Redberry) {
             log "Setting up 3-gluon diagrams for $bottomSpin ..."
-            def simplify = FeynmanRules & gcc & qVertices & ccVertex & fullSimplify
+            def simplify = assumptions & FeynmanRules & qVertices & ccVertex & fullSimplify
+
             //first diagram
+            log 'a) ...'
             def Ma = '1'.t
-            Ma *= simplify >> "eps1^a[h1] * Vcc^cC * V_{cC aA dD}[-p1_a[charm] - p2_a[charm], k1_a, k2_a - p_a[bottom]]".t
-            Ma *= simplify >> "G^ed[-k2_a + p_a[bottom]]*g^ED".t
+            Ma *= simplify >> 'eps1^a[h1] * Vcc^cC * V_{cC aA dD}[-p1_a[charm] - p2_a[charm], k1_a, k2_a - p_a[bottom]]'.t
+            Ma *= simplify >> "G^de[-k2_a + p_a[bottom]]*g^DE".t
             Ma *= simplify >> "A${bottomSpin}_{eE bB}[bottom, -k2_a + p_a[bottom], k2_a] * eps2^b[h2]".t
 
             //second diagram
+            log 'b) ...'
             def Mb = '1'.t
             Mb *= simplify >> "eps2^b[h2] * Vcc^cC * V_{cC bB dD}[-p1_a[charm] - p2_a[charm], k2_a, k1_a - p_a[bottom]]".t
             Mb *= simplify >> "G^ed[-k1_a + p_a[bottom]]*g^ED".t
             Mb *= simplify >> "A${bottomSpin}_{eE aA}[bottom, -k1_a + p_a[bottom], k1_a] * eps1^a[h1]".t
 
-            def M = Ma + Mb
+            //third diagram (s-chanel)
+            log 'c) ...'
+            def Mc = '1'.t
+            Mc *= simplify >> 'eps1^a[h1] * eps2^b[h2] * V_{aA bB cC}[k1_a, k2_a, -k1_a - k2_a]'.t
+            Mc *= simplify >> "G^cd[k1_a + k2_a]*g^CD".t
+            Mc *= simplify >> "A${bottomSpin}_{dD eE}[bottom, k1_a + k2_a, -p1_a[charm] - p2_a[charm]] * Vcc^eE".t
+
+
+            log 'simplifying ...'
+            def M = Ma + Mb + Mc
             M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+            M <<= (gcc << (massesSubs & mFactor))
+            log 'simplifying ...'
+            M <<= fullSimplifyE & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
 
             log "... done"
             return (gluon3Diagrams[bottomSpin] = M)
@@ -144,7 +140,7 @@ class ChiBCC extends Setup {
 
         use(Redberry) {
 
-            quarkDiagramsNotProjected = '0'.t
+            quarkDiagramsNotProjected = 0.t
             // (1,2,3)
             quarkDiagramsNotProjected += 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
             // (3,2,1)
@@ -160,6 +156,7 @@ class ChiBCC extends Setup {
 
 
             def masses = 'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t & 'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+            quarkDiagramsNotProjected <<= assumptions
             quarkDiagramsNotProjected <<= 'pCharm_m = p1_m[charm] + p2_m[charm]'.t
             quarkDiagramsNotProjected <<= FeynmanRules & spinSingletProjector['bottom']
             quarkDiagramsNotProjected <<= dTraceSimplify
@@ -180,69 +177,14 @@ class ChiBCC extends Setup {
             Mc <<= totalSpinProjector[bottomSpin]
             if (bottomSpin == 'axial')
                 Mc <<= momentumConservation
-            Mc <<= fullSimplify & massesSubs & mFactor & gcc
+            log 'simplifying ...'
+            Mc <<= fullSimplify & massesSubs & mFactor
+            Mc <<= (gcc << (massesSubs & mFactor))
+            log 'simplifying ...'
+            Mc <<= fullSimplifyE & massesSubs & mFactor
             Mc <<= spinorsSimplify & massesSubs & mFactor
             log "... done"
             return (quarkDiagrams[bottomSpin] = Mc)
-        }
-    }
-
-    Tensor setupFeynmanDiagrams(bottomSpin) {
-        use(Redberry) {
-
-
-            def simplify = FeynmanRules & qVertices & ccVertex & fullSimplify
-            //first diagram
-            def Ma = '1'.t
-            Ma *= simplify >> "eps1^a[h1] * B_{aA cC}[charm, k1_i, -k1_i + p1_i[charm] + p2_i[charm]]".t
-            Ma *= simplify >> 'G^cd[k1_i - p1_i[charm] - p2_i[charm]] * g^CD'.t
-            Ma *= simplify >> "eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
-
-            //second diagram
-            def Mb = '1'.t
-            Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]]".t
-            Mb *= simplify >> 'G^cd[k1_i - p_i[bottom]] * g^CD'.t
-            Mb *= simplify >> "eps2^b[h2] * B_{dD bB}[charm, -k2_i + p1_i[charm] + p2_i[charm], k2_i]".t
-
-            def Mc = getQuarkDiagrams(bottomSpin)
-
-            def M = Ma + Mb + Mc
-            M <<= 'cu[p1_a[charm]]*p1_a[charm]*G^a = -m[charm]*cu[p1_a[charm]]'.t &
-                    'p2_a[charm]*G^a*v[p2_a[charm]] = m[charm]*v[p2_a[charm]]'.t
-
-            return M
-        }
-    }
-
-    Tensor calculateSquaredMatrixElement(String bottomSpin) {
-        squareMatrixElement(setupFeynmanDiagrams(bottomSpin), "bottom: $bottomSpin")
-    }
-
-    void calculateAllProcesses(String output) {
-        File file = new File(output)
-        if (file.exists()) {
-            file.delete();
-            file = new File(output)
-        }
-        File fileMaple = new File(output)
-
-        use(Redberry) {
-
-            for (def bottomSpin in ['scalar', 'axial', 'tensor']) {
-                def squared = calculateSquaredMatrixElement(bottomSpin)
-
-
-                assert TensorUtils.isSymbolic(squared)
-
-                def toStr = [scalar: 0, axial: 1, tensor: 2]
-                def stringResult = (squared).toString(WolframMathematica)
-                file << "chiB${toStr[bottomSpin]}cc = ${stringResult};"
-                file << "\n"
-
-                stringResult = (squared).toString(Maple)
-                fileMaple << "chiB${toStr[bottomSpin]}cc := ${stringResult}:"
-                fileMaple << "\n"
-            }
         }
     }
 }

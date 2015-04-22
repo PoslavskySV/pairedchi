@@ -69,7 +69,7 @@ class Setup implements AutoCloseable {
 
     /** Transformations */
     public def mandelstam, massesSubs, momentums,
-               dTrace, dTraceSimplify, uTrace, uSimplify, leviSimplify, fullSimplify,
+               dTrace, dTraceSimplify, uTrace, uSimplify, leviSimplify, fullSimplify, fullSimplifyE,
                conjugateSpinors, momentumConservation
 
     def mathematicaKernel
@@ -134,7 +134,7 @@ class Setup implements AutoCloseable {
             if (projectCC)
                 PS = 'PS_mn[k_a] = -g_mn'.t
             else {
-                PS = 'PS_mn[k_a] = -g_mn + (k_m*n_n + k_n*n_m)/(k_a*n^a) + k_m*k_n/(k_a*n^a)**2*n_a*n^a'.t
+                PS = 'PS_mn[k_a] = -g_mn - (k_m*n_n + k_n*n_m)/(k_a*n^a) + n_a*n^a*k_m*k_n/(k_a*n^a)**2'.t
                 //particular n
                 PS <<= 'n_a = p_a[bottom]'.t
             }
@@ -143,10 +143,9 @@ class Setup implements AutoCloseable {
             //Quark propagator
             D = 'D[p_m, mass] = I*(mass + p_m*G^m)/(p_m*p^m - mass**2)'.t
             //Gluon propagator
-            G = PS >> 'G_mn[k_a] = -I*PS_mn[k_a]/(k_a*k^a)'.t
+            G = PS >> 'G_mn[k_a] = I*PS_mn[k_a]/(k_a*k^a)'.t
             //3-gluon vertex
-            V3 = ('V_{Aa Bb Cc}[k1_m, k2_m, k3_m] =' +
-                    'g*f_{ABC}*(g_ab*(k1_c - k2_c) + g_bc*(k2_a - k3_a) + g_ca*(k3_b - k1_b))').t
+            V3 = 'V_{Aa Bb Cc}[k1_m, k2_m, k3_m] = g*f_{ABC}*(g_ab*(k1_c - k2_c) + g_bc*(k2_a - k3_a) + g_ca*(k3_b - k1_b))'.t
             //All Feynman rules in one transformation
             FeynmanRules = V & D & G & V3
         }
@@ -239,6 +238,11 @@ class Setup implements AutoCloseable {
                     leviSimplify &
                     ExpandAll[simplifyMetrics] & simplifyMetrics
 
+            fullSimplifyE = simplifyMetrics &
+                    Expand[simplifyMetrics] & simplifyMetrics &
+                    leviSimplify &
+                    Expand[simplifyMetrics] & simplifyMetrics
+
             dTraceSimplify = DiracTrace[[Gamma: 'G_a', Simplifications: fullSimplify]]
 
             if (projectCC)
@@ -254,7 +258,7 @@ class Setup implements AutoCloseable {
      */
     Transformation taylor(momentum) {
         use(Redberry) {
-            { x -> ((Differentiate[momentum.t] & momentum.t.eq(0.t)) >> x) * momentum.t } as Transformation
+            { expr -> ((Differentiate[momentum.t] & momentum.t.eq(0.t)) >> expr) * momentum.t } as Transformation
         }
     }
 
@@ -324,7 +328,9 @@ class Setup implements AutoCloseable {
             return pairVertex
 
         use(Redberry) {
+            //two diagrams
             def B = 'cu[p1_m[fl]]*(V_aA*D[p1_m[fl] - k1_m, m[fl]]*V_bB + V_bB*D[p1_m[fl] - k2_m, m[fl]]*V_aA)*v[p2_m[fl]]'.t
+
             // Simplifying
             B <<= FeynmanRules & ExpandAll[EliminateMetrics] & EliminateMetrics &
                     'p1_m[fl]*p1^m[fl] = m[fl]**2'.t & 'p2_m[fl]*p2^m[fl] = m[fl]**2'.t
