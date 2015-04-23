@@ -22,9 +22,11 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
+import cc.redberry.core.context.CC
+import cc.redberry.core.context.OutputFormat
+import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
-import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 
 import static cc.redberry.groovy.RedberryStatic.*
@@ -32,7 +34,7 @@ import static cc.redberry.groovy.RedberryStatic.*
 /**
  * Created by poslavsky on 03/04/15.
  */
-class ChiBCC extends Setup {
+class SetupCC extends Setup {
     private def qVertices, ccVertex
 
     private Map quarkDiagrams = [:]
@@ -44,11 +46,11 @@ class ChiBCC extends Setup {
     private Transformation spinorsSimplify, dSimplify
     private Transformation assumptions
 
-    ChiBCC() {
+    SetupCC() {
         this(Identity)
     }
 
-    ChiBCC(assumptions) {
+    SetupCC(assumptions) {
         super(false, true);
         this.assumptions = assumptions
         use(Redberry) {
@@ -185,6 +187,46 @@ class ChiBCC extends Setup {
             Mc <<= spinorsSimplify & massesSubs & mFactor
             log "... done"
             return (quarkDiagrams[bottomSpin] = Mc)
+        }
+    }
+
+    public static void ward(String bottomSpin, File output) {
+        for (int k = 1; k <= 2; ++k) {
+            CC.reset()
+            println "k = $k"
+
+            use(Redberry) {
+                def epss = "eps${k}_a[h${k}] = k${k}_a".t
+                SetupCC stp = new SetupCC(epss);
+                def methods = [1: stp.&getGluonDiagrams, 0: stp.&getQuarkDiagrams, 2: stp.&get3GluonDiagrams]
+                def amps = new SumBuilder()
+
+                for (int j = 0; j < 3; ++j) {
+                    def diag = methods[j](bottomSpin)
+                    diag <<= (epss & stp.mandelstam & stp.massesSubs)
+                    amps << diag
+                }
+                def amp2 = stp.squareMatrixElement(amps.build())
+                amp2 <<= stp.mandelstam & stp.massesSubs
+                def r = "ward$bottomSpin$k".t.eq(amp2)
+                output << r.toString(OutputFormat.Redberry)
+            }
+        }
+    }
+
+    public static void calc(String bottomSpin, File output) {
+        use(Redberry) {
+            SetupCC stp = new SetupCC();
+            def methods = [1: stp.&getGluonDiagrams, 0: stp.&getQuarkDiagrams, 2: stp.&get3GluonDiagrams]
+            def amps = new SumBuilder()
+
+            for (def i = 0; i < 3; ++i)
+                amps << methods[i](bottomSpin)
+
+            def amp2 = stp.squareMatrixElement(amps.build())
+            amp2 <<= stp.mandelstam & stp.massesSubs
+            def r = "r$i".t.eq(amp2)
+            output << r.toString(OutputFormat.Redberry)
         }
     }
 }

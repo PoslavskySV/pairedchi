@@ -22,6 +22,7 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
+import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.groovy.Redberry
@@ -29,11 +30,11 @@ import cc.redberry.groovy.Redberry
 /**
  * Created by poslavsky on 02/04/15.
  */
-class ChiBChiC extends Setup {
+class SetupChi extends Setup {
     private def qVertices
     private Map diagrams = [:]
 
-    ChiBChiC() {
+    SetupChi() {
         super(true, true);
         use(Redberry) {
             qVertices = effectiveQuarkoniaVertices().values() as Transformation
@@ -66,6 +67,18 @@ class ChiBChiC extends Setup {
 
             log '...done'
             return (diagrams[charmSpin + bottomSpin] = M)
+        }
+    }
+
+
+    public static void calc(String bottomSpin, String charmSpin, File output) {
+        use(Redberry) {
+            SetupChi stp = new SetupChi();
+            def amps = stp.setupFeynmanDiagrams(charmSpin, bottomSpin)
+            def amp2 = stp.squareMatrixElement(amps)
+            amp2 <<= stp.mandelstam & stp.massesSubs
+            def r = "charm${charmSpin}bottom${bottomSpin}".t.eq(amp2)
+            output << r.toString(OutputFormat.Redberry)
         }
     }
 }

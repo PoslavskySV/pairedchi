@@ -1,0 +1,67 @@
+#!/bin/bash
+
+skipTests=false
+while [[ $# > 0 ]]
+do
+    key="$1"
+    case $key in
+        -r)
+            rebuild=true
+            shift
+        ;;
+        -s)
+            skipTests=true
+            shift
+        ;;
+        -jlink)
+            shift
+            jlinkPath="$1"
+            shift
+        ;;
+        *)
+            break
+        ;;
+esac
+done
+
+if [ ! -f target/bbcc.jar ];
+then
+    rebuild=true
+    if [ -z "$skipTests" ]; 
+    then
+        skipTests=true
+    fi
+fi
+
+if [ ! -z "$rebuild" ]; 
+then
+    dSkipTests=""
+    if [[ ${skipTests} == true ]];
+    then
+        dSkipTests="-DskipTests"
+    fi
+
+    dJLink=""
+    if [ ! -z "$jlinkPath" ];
+    then
+        dJLink="\"-Djlink=${jlinkPath}\""
+    fi
+    echo mvn clean install assembly:single ${dSkipTests} ${dJLink}
+    printf "\n"
+    mvn clean install assembly:single ${dSkipTests} ${dJLink}
+fi
+
+if [ ! -z "$jlinkPath" ];
+then
+    classpath="${jlinkPath}:target/bbcc.jar"
+else
+    classpath="/Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar:target/bbcc.jar"
+fi
+
+
+printf "\n\n\n\n\n"
+echo java -Xmx20g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
+printf "\n"
+java -Xmx20g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
+
+

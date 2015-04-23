@@ -23,13 +23,11 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
-import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 
 import static cc.redberry.core.indices.IndexType.Matrix1
@@ -55,8 +53,7 @@ class SetupTest {
 
                 def defs = new Setup(cc)
                 def t = 'Tr[V_aA*V_bB]'.t
-                t <<= defs.dTrace & defs.uTrace
-
+                t <<= defs.FeynmanRules & defs.dTrace & defs.uTrace
                 assert t == '-2*g**2*g_{ab}*g_{BA}'.t
             }
 
@@ -239,78 +236,6 @@ class SetupTest {
                         & Factor
                 ) >> temp
             }()) == 0.t
-        }
-    }
-
-    @Test
-    public void testUTrace() throws Exception {
-        use(Redberry) {
-
-            def stp = new Setup(false, true)
-            CC.defaultOutputFormat = OutputFormat.Redberry
-            def tensor = "v^{c'D'}[p1_{m}[charm]]*v^{b'B'}[p2_{m}[charm]]*G_{a}^{e'}_{c'}*G^{ca'}_{b'}*G_{d}^{d'}_{f'}*G^{mf'}_{e'}*T^{AC'}_{D'}*T^{CA'}_{B'}*T^{BE'}_{C'}*cu_{d'E'}[p2_{m}[charm]]*cu_{a'A'}[p1_{m}[charm]]*f_{BAC}*eps1^{a}[h1]*eps1_{c}[h1]*p2_{b}[charm]*eps2^{b}[h2]*eps2^{e}[h2]*p_{e}[bottom]*k2^{d}*k1_{m}".t
-            tensor <<= stp.epsSum
-            println tensor
-            tensor <<= stp.uTrace
-            println tensor
-
-            tensor <<= stp.mandelstam & stp.dTraceSimplify &
-                    stp.fullSimplify & stp.massesSubs
-
-            println tensor
-        }
-    }
-
-    @Ignore
-    @Test
-    public void testPerformance() throws Exception {
-        use(Redberry) {
-            def stp = new Setup(false, true)
-            def exprs = []
-            Setup.class.classLoader.getResourceAsStream('expressions').eachLine { l ->
-                exprs << l.t
-            }
-
-            def t = exprs[1]
-
-            t <<= stp.epsSum
-            println('epsSum: ' + t)
-            println()
-
-            t <<= stp.uTrace
-            println('uTrace: ' + t)
-            println()
-
-            t <<= stp.mandelstam
-            //           t <<= stp.massesSubs
-            println('mandelstam: ' + t)
-            println()
-
-            t <<= stp.dTraceSimplify
-            println('dTraceSimplify: ' + t)
-            println()
-
-            t <<= stp.fullSimplify
-            println('fullSimplify: ' + t)
-            println()
-
-            t <<= stp.massesSubs
-            println('massesSubs: ' + t)
-            println()
-
-            t <<= stp.wolframFactorTr
-            println('final: ' + t)
-
-
-            println exprs.size()
-            timing {
-                for (int i = 0; i < exprs.size(); i++) {
-                    exprs[i] <<= stp.epsSum & stp.uTrace & stp.mandelstam &
-                            stp.dTraceSimplify & stp.fullSimplify & stp.massesSubs & stp.wolframFactorTr
-                    assert TensorUtils.isSymbolic(exprs[i])
-                }
-            }
-
         }
     }
 }
