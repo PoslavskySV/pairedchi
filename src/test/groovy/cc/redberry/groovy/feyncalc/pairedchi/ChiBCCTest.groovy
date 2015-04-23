@@ -37,76 +37,11 @@ import static cc.redberry.groovy.RedberryStatic.*
 class ChiBCCTest {
 
     @Test
-    public void test1123e4() throws Exception {
+    public void testGluonDiags_LorentzCharge() throws Exception {
         use(Redberry) {
             ChiBCC stp = new ChiBCC();
-            def t = stp.get3GluonDiagrams('scalar')
-            println TensorUtils.getAllDiffSimpleTensors(t)
-            println t[0]
-            println t[1]
-            println t[2]
-            t = stp.squareMatrixElement(t)
-            t <<= stp.massesSubs
-            println TensorUtils.getAllDiffSimpleTensors(t)
-            println t.class
-            println t[0]
-        }
-    }
-
-    @Test
-    public void test1123() throws Exception {
-        use(Redberry) {
-            ChiBCC stp = new ChiBCC();
-            for (def spin in ['scalar', 'axial', 'tensor']) {
-
-                println 'GLUON'
-                def t = stp.getGluonDiagrams(spin)
-                println t.size()
-                println t[0]
-                println t[1]
-                println t[2]
-
-                println 'QUARK'
-                t = stp.getQuarkDiagrams(spin)
-                println t.size()
-                println t[0]
-                println t[1]
-                println t[2]
-                //todo assert content!
-            }
-        }
-    }
-
-    @Test
-    public void testa121232312323() throws Exception {
-        use(Redberry) {
-            def spin = 'scalar'
-            def path = '/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/ChiBCC_ward_' + spin + '.m'
-            def file = new File(path)
-            if (file.exists()) {
-                file.delete()
-                file = new File(path)
-            }
-
-            ChiBCC stp = new ChiBCC();
-
-            def diag1 = stp.getGluonDiagrams(spin)
-            diag1 <<= 'eps2_a[h2] = k2_a'.t.hold & stp.mandelstam & stp.massesSubs
-
-            def r1 = stp.massesSubs >> stp.squareMatrixElement(diag1)
-
-            println 'exp'
-            file << ('r1=' + r1.toString(OutputFormat.WolframMathematica) + ';')
-
-//            r2 <<= ExpandAll
-//            println TensorUtils.hasImaginaryPart(r2)
-//
-//            println 'r2'
-//            //println r2
-//
-//
-//            r2 <<= stp.mFactor
-//            println r2
+            def qs = stp.getGluonDiagrams('scalar')
+            recreateTempFile() << stp.squareMatrixElement(qs).toString(OutputFormat.WolframMathematica)
         }
     }
 
@@ -115,14 +50,14 @@ class ChiBCCTest {
         use(Redberry) {
             ChiBCC stp = new ChiBCC();
             def qs = stp.getQuarkDiagrams('scalar')
-            println TensorUtils.getAllDiffSimpleTensors(qs)
+            assert !TensorUtils.getAllDiffSimpleTensors(qs).collect({ x -> x.name }).contains('d_ABC'.t.name)
         }
     }
 
     @Test
     public void testWardForScalar() throws Exception {
         use(Redberry) {
-            def epss = Identity //'eps2_a[h2] = k2_a'.t //& 'eps2_a[h2] = k2_a'.t
+            def epss = 'eps2_a[h2] = k2_a'.t //& 'eps2_a[h2] = k2_a'.t
 
             def spin = 'scalar'
             def path = '/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/ChiBCC_ward_1_' + spin + '.m'
@@ -143,8 +78,8 @@ class ChiBCCTest {
 
                 //recreateTempFile() << diag
 
-//                def diag2 = (stp.mandelstam & stp.massesSubs) >> stp.squareMatrixElement(diag)
-//                file << "r$i = ${diag2.toString(OutputFormat.WolframMathematica)} ;\n"
+                //def diag2 = (stp.mandelstam & stp.massesSubs) >> stp.squareMatrixElement(diag)
+                //file << "r$i = ${diag2.toString(OutputFormat.WolframMathematica)} ;\n"
 
                 amps << diag
             }

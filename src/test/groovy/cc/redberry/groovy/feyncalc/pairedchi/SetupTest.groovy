@@ -24,12 +24,18 @@ package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
 import cc.redberry.core.context.OutputFormat
+import cc.redberry.core.tensor.SumBuilder
+import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 
+import static cc.redberry.core.indices.IndexType.Matrix1
+import static cc.redberry.core.indices.IndexType.Matrix2
+import static cc.redberry.groovy.RedberryPhysics.DiracTrace
+import static cc.redberry.groovy.RedberryPhysics.mandelstam
 import static cc.redberry.groovy.RedberryStatic.*
 
 /**
@@ -142,11 +148,8 @@ class SetupTest {
         }
     }
 
-    /**
-     * Testing Ward identities
-     */
     @Test
-    public void testEffectivePairVertexWard() {
+    public void testEffectivePairVertex1() {
         use(Redberry) {
             def stp = new Setup(false)
             def vertex = stp.effectivePairVertex()
@@ -155,34 +158,66 @@ class SetupTest {
             for (def f in ['charm', 'bottom'])
                 assert (vertex & ExpandAll) >> "B_{aA bB}[${f}, k1_m, k2_m] - B_{bB aA}[${f}, k2_m, k1_m]".t == 0.t
 
-            // Ward identities
-            def tr = stp.fullSimplify &
-                    //'cu[p1_a[charm]]*p1_a[charm]*G^a = m[charm]*cu[p1_a[charm]]'.t &
-                    //'p2_a[charm]*G^a*v[p2_a[charm]] = -m[charm]*v[p2_a[charm]]'.t &
-                    //'v[p2_a[charm]] * cu[p1_a[charm]] = 1'.t &
-                    stp.dTrace & stp.uTrace & stp.fullSimplify &
-                    stp.massesSubs &
-                    stp.mFactor
+        }
+    }
 
-            def temp
+    @Test
+    public void testEffectivePairVertexWard() {
+        use(Redberry) {
+            def stp = new Setup(true)
 
-            temp = vertex >> "k1^a*B_{aA bB}[charm, k1_i, k2_i]".t
-            temp *= 'I'.t
-            temp <<= 'k1_a = p1_a[charm] + p2_a[charm] - k2_a'.t & tr
-            temp <<= 'G_a = g_a'.t & 'T_A = t_A'.t & EliminateMetrics & 'cu[p1_m[charm]] * v[p2_m[charm]] = cu*v'.t & EliminateMetrics
-            temp <<= 'g_a*g^a = 1'.t
-            temp <<= tr
-            temp <<= 'cu*p1_a[charm]*g^a = m[charm]*cu '.t &
-                    'p2_a[charm]*g^a*v = -m[charm]*v '.t
-            temp <<= tr
+            //two diagrams
+            def g2 = 'cu[p1_m[fl]]*(V_aA*D[p1_m[fl] - k1_m, m[fl]]*V_bB + V_bB*D[p1_m[fl] - k2_m, m[fl]]*V_aA)*v[p2_m[fl]]'.t
+            //third diagram (3-gluon)
+            def g3 = 'cu[p1_m[fl]]*V^cC*v[p2_m[fl]]*G_c^d[k1_a + k2_a]*V_{aA bB dC}[k1_a, k2_a, -k1_a -k2_a]'.t
+            def M = g2 + g3
+            // Simplifying
+            M <<= stp.FeynmanRules & ExpandAll[EliminateMetrics] & EliminateMetrics &
+                    'p1_m[fl]*p1^m[fl] = m[fl]**2'.t & 'p2_m[fl]*p2^m[fl] = m[fl]**2'.t
+            def pairVertex = 'B_{aA bB}[fl, k1_m, k2_m]'.t.eq(M)
 
-            println temp
 
-            assert temp == 0.t
+            def mndlst = setMandelstam([k1_m: '0', k2_m: '0', 'p1_m[charm]': 'm[charm]', 'p2_m[charm]': 'm[charm]'])
+            def simplifyMetrics = EliminateMetrics &
+                    'eps1^a[h1] * k1_a = 0'.t &
+                    'eps2^a[h2] * k2_a = 0'.t &
+                    mndlst &
+                    'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 4".t & "d^A'_A' = 3".t
+            def fullSimplify = simplifyMetrics &
+                    ExpandAll[simplifyMetrics] & simplifyMetrics &
+                    stp.leviSimplify &
+                    ExpandAll[simplifyMetrics] & simplifyMetrics
 
-            temp = vertex >> "k2^b*B_{aA bB}[charm, k1_i, k2_i]".t
-            temp <<= 'k2_a = p1_a[charm] + p2_a[charm] - k1_a'.t & tr
-            assert temp == 0.t
+            def dTraceSimplify = DiracTrace[[Gamma: 'G_a', Simplifications: fullSimplify]]
+
+            for (def amp in [
+                    'k1^a * eps2^b[h2] * B_{aA bB}[charm, k1_m, k2_m]'.t,
+                    'eps1^a[h1] * k2^b * B_{aA bB}[charm, k1_m, k2_m]'.t
+            ]) {
+                amp <<= pairVertex & fullSimplify
+
+                def sum = new SumBuilder()
+                for (int i = 0; i < amp.size(); ++i)
+                    for (int j = 0; j < amp.size(); ++j) {
+                        def ampC = amp[j]
+                        ampC <<= Conjugate & Reverse[Matrix1, Matrix2] & stp.conjugateSpinors
+                        ampC <<= { expr -> (expr.indices.free.si % expr.indices.free.si.inverted) >> expr } as Transformation
+
+                        def amp2 = amp[i] * ampC
+                        def indexless = amp2.indexlessSubProduct
+                        def tensor = amp2.dataSubProduct
+
+                        tensor <<= stp.epsSum & stp.uTrace & mndlst & dTraceSimplify &
+                                fullSimplify & stp.massesSubs & stp.uSimplify
+                        sum << indexless * tensor
+                    }
+
+                def amp2 = sum.build()
+                amp2 <<= stp.massesSubs
+                amp2 <<= 'u = 2*mc**2 - s - t'.t
+
+                assert stp.wolframFactorTr >> amp2 == 0.t
+            }
         }
     }
 

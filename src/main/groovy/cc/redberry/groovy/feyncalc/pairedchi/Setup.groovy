@@ -393,7 +393,7 @@ class Setup implements AutoCloseable {
             tensor <<= epsSum & uTrace & mandelstam & dTraceSimplify &
                     fullSimplify & massesSubs & uSimplify
 
-            tensor <<= 'I = 0'.t
+//            tensor <<= 'I = 0'.t
 
             //uTrace & uSimplify
 
