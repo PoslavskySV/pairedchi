@@ -22,4 +22,4 @@ function process(){
 export progressFile
 export -f process
 export list
-echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 3 process {1} {2} {3}
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 3 process "$@" {1} {2} {3}
