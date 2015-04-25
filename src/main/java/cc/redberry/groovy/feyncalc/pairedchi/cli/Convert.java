@@ -77,17 +77,16 @@ public final class Convert implements Process {
 
         public OutputFormat getOutputFormat() {
             switch (params.get(0).toLowerCase()) {
+                case "w":
+                case "math":
                 case "mathematica":
                     return OutputFormat.WolframMathematica;
+                case "m":
                 case "maple":
                     return OutputFormat.Maple;
                 default:
                     throw new ParameterException("Wrong format");
             }
-        }
-
-        public String getCharmSpin() {
-            return params.get(1).toLowerCase();
         }
 
         @Override

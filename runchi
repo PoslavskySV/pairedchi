@@ -1,0 +1,25 @@
+#!/bin/bash
+
+outputPath="output"
+list=(
+	"scalar" "scalar" "${outputPath}/ss.redberry"
+	"scalar" "axial" "${outputPath}/sa.redberry"
+	"scalar" "tensor" "${outputPath}/st.redberry"
+	"axial" "scalar" "${outputPath}/as.redberry" 
+	"axial" "axial" "${outputPath}/aa.redberry"
+	"axial" "tensor" "${outputPath}/at.redberry"
+	"tensor" "scalar" "${outputPath}/ts.redberry" 
+	"tensor" "axial" "${outputPath}/ta.redberry"
+	"tensor" "tensor" "${outputPath}/tt.redberry"
+	)
+
+progressFile="${outputPath}/chiProgress"
+function process(){
+	echo ./bbcc chi -f `echo "$@"` `echo "> ${progressFile}"`
+	./bbcc chi -f `echo "$@"` > `echo "${3}Progress"`
+}
+
+export progressFile
+export -f process
+export list
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 3 process {1} {2} {3}

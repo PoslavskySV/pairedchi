@@ -133,16 +133,16 @@ class SetupCCTest {
 //        }
 //    }
 //
-//    private static File getTempFile() {
-//        new File('/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/temp')
-//    }
-//
-//    private static File recreateTempFile() {
-//        File t = getTempFile()
-//        if (t.exists())
-//            t.delete()
-//        getTempFile()
-//    }
+    private static File getTempFile() {
+        new File('/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/temp')
+    }
+
+    private static File recreateTempFile() {
+        File t = getTempFile()
+        if (t.exists())
+            t.delete()
+        getTempFile()
+    }
 
     private static getDimSubs() {
         use(Redberry) {

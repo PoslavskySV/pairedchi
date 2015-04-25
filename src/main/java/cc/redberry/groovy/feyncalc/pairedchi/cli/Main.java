@@ -24,6 +24,7 @@ package cc.redberry.groovy.feyncalc.pairedchi.cli;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import com.beust.jcommander.ParameterException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -73,7 +74,12 @@ public class Main {
             return;
         }
 
-        process.parameters().validate();
+        try {
+            process.parameters().validate();
+        } catch (ParameterException e) {
+            System.out.println(e.getMessage());
+            printProcessHelp(jCommander, process);
+        }
 
         process.run();
     }

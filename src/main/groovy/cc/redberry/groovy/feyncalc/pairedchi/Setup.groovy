@@ -114,8 +114,19 @@ class Setup implements AutoCloseable {
 
     void setupMathematica() {
         log 'Setting up Mathematica'
-        //for OS X
-        mathematicaKernel = MathLinkFactory.createKernelLink("-linkmode", "launch", "-linkname", "\"/Applications/Mathematica.app/Contents/MacOS/MathKernel\" -mathlink");
+        String[] args;
+        switch (os()) {
+            case 'mac':
+                args = ["-linkmode", "launch", "-linkname", "\"/Applications/Mathematica.app/Contents/MacOS/MathKernel\" -mathlink"];
+                break
+            case 'linux':
+                args = ["-linkmode", "launch", "-linkname", "math -mathlink"]
+                break
+            default:
+                throw new RuntimeException('No Windows')
+        }
+
+        mathematicaKernel = MathLinkFactory.createKernelLink(args)
         mathematicaKernel.discardAnswer();
 
         def wolframFactor = { tensor ->
@@ -357,7 +368,8 @@ class Setup implements AutoCloseable {
             conjugate &= Reverse[Matrix1, Matrix2]
             conjugate &= conjugateSpinors
 
-
+            //def cMatrixElement = conjugate >> matrixElement
+            //return ParallelExpand.parallelExpand(matrixElement, cMatrixElement, this.&calcProduct as Transformation, { l -> this.log(l) })
             def totalTermsNumber = matrixElement.size() * matrixElement.size()
             def counter = 0
 
@@ -385,18 +397,15 @@ class Setup implements AutoCloseable {
         }
     }
 
-    Tensor calcProduct(Product part) {
+    Tensor calcProduct(Tensor t) {
         use(Redberry) {
+            if (t.class != Product)
+                return (epsSum & uTrace & mandelstam & dTraceSimplify & fullSimplify & massesSubs & uSimplify) >> t
+            Product part = t
             def indexless = part.indexlessSubProduct
             def tensor = part.dataSubProduct
-
             tensor <<= epsSum & uTrace & mandelstam & dTraceSimplify &
                     fullSimplify & massesSubs & uSimplify
-
-//            tensor <<= 'I = 0'.t
-
-            //uTrace & uSimplify
-
             assert TensorUtils.isSymbolic(tensor)
             return indexless * tensor
         }
@@ -416,4 +425,12 @@ class Setup implements AutoCloseable {
             mathematicaKernel.close()
     }
 
+    private static String os() {
+        def os = System.getProperty('os.name').toLowerCase()
+        if (os.contains('mac'))
+            return 'mac'
+        else if (os.contains('nux'))
+            return 'linux'
+        return null
+    }
 }
