@@ -59,9 +59,9 @@ else
 fi
 
 
-printf "\n\n\n\n\n"
-echo java -Xmx6g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
-printf "\n"
+# printf "\n\n\n\n\n"
+# echo java -Xmx6g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
+# printf "\n"
 java -Xmx6g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
 
 

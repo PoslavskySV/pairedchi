@@ -23,15 +23,13 @@
 package cc.redberry.groovy.feyncalc.pairedchi.cli;
 
 import cc.redberry.core.context.OutputFormat;
-import cc.redberry.core.tensor.Tensor;
 import cc.redberry.core.tensor.Tensors;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
-import org.apache.commons.io.FileUtils;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.List;
 
 /**
@@ -53,26 +51,34 @@ public final class Convert implements Process {
 
     @Override
     public void run() throws Exception {
-        String redberry = FileUtils.readFileToString(new File(parameters.getInputFile()));
-        Tensor t = Tensors.parse(redberry);
-        try (FileOutputStream out = new FileOutputStream(parameters.getOutputFile())) {
-            out.write(t.toString(parameters.getOutputFormat()).getBytes());
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+        String line;
+        OutputFormat of = parameters.getOutputFormat();
+        while ((line = bufferedReader.readLine()) != null) {
+            line = line.trim();
+            if (line.isEmpty())
+                continue;
+            if (line.endsWith(";"))
+                line = line.substring(0, line.length() - 1);
+            try {
+                System.out.println(Tensors.parse(line).toString(of));
+            } catch (Exception e) {
+                System.err.println("Invalid input: " + line);
+                System.err.println(e.getMessage());
+                System.exit(1);
+            }
         }
     }
 
     @Parameters(commandDescription = "Converts Redberry output to Mathematica or Maple",
             optionPrefixes = "-")
     public static final class ConvertParameters extends ProcessParameters {
-        @Parameter(description = "format input output")
+        @Parameter(description = "format input_stream")
         public List<String> params;
-
-        public String getInputFile() {
-            return params.get(1);
-        }
 
         @Override
         public String getOutputFileName() {
-            return params.get(2);
+            return null;
         }
 
         public OutputFormat getOutputFormat() {
@@ -91,12 +97,6 @@ public final class Convert implements Process {
 
         @Override
         public void validate() {
-            if (params.size() != 3)
-                throw new ParameterException("Missing arguments.");
-            if (!new File(getInputFile()).exists())
-                throw new ParameterException("Input file not exists.");
-            getOutputFormat();
-            super.validate();
         }
     }
 }

@@ -24,6 +24,7 @@ package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
+import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 import org.junit.Ignore
@@ -56,6 +57,42 @@ class SetupCCTest {
             assert !TensorUtils.getAllDiffSimpleTensors(qs).collect({ x -> x.name }).contains('d_ABC'.t.name)
         }
     }
+
+//    @Test
+//    public void testWardForTensor() throws Exception {
+//        use(Redberry) {
+//            def epss = 'eps2_a[h2] = k2_a'.t //& 'eps2_a[h2] = k2_a'.t
+//
+//            def spin = 'tensor'
+//            def path = '/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/ChiBCC_ward_1_' + spin// + '.m'
+//            def file = new File(path)
+//            if (file.exists()) {
+//                file.delete()
+//                file = new File(path)
+//            }
+//
+//            SetupCC stp = new SetupCC(epss);
+//            def methods = [1: stp.&getGluonDiagrams, 0: stp.&getQuarkDiagrams, 2: stp.&get3GluonDiagrams]
+//            def amps = new SumBuilder()
+//
+//            for (int i = 0; i < 3; ++i) {
+//                def diag = methods[i](spin)
+//
+//                diag <<= (epss & stp.mandelstam & stp.massesSubs)
+//
+//                //recreateTempFile() << diag
+//
+//                //def diag2 = (stp.mandelstam & stp.massesSubs) >> stp.squareMatrixElement(diag)
+//                //file << "r$i = ${diag2.toString(OutputFormat.WolframMathematica)} ;\n"
+//
+//                amps << diag
+//            }
+//            def r = (stp.mandelstam & stp.massesSubs) >> stp.squareMatrixElement(amps.build())
+//            file << "r := ${r.toString(OutputFormat.Maple)} ;"
+//            new File('/Users/poslavsky/Projects/Mathematica/ChiPairedProduction/ChiBCC_ward_1_' + spin + '.r') << r
+//        }
+//    }
+
 //
 //    @Test
 //    public void testWardForScalar() throws Exception {
