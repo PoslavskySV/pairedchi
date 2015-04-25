@@ -3,11 +3,14 @@
 outputPath="output"
 list=("scalar" "${outputPath}/s.redberry" "axial" "${outputPath}/a.redberry" "tensor" "${outputPath}/t.redberry")
 
-function process(){
-	echo "./bbcc cc -f `echo "$@"` > `echo "${2}Progress"`"
-	# ./bbcc cc -f `echo "$@"` > `echo "${2}Progress"`
+jlinkArg="$@"
+export jlinkArg
+
+function ccProcess(){
+	echo "./bbcc `echo "${jlinkArg}"` cc -f `echo "$@"` > `echo "${2}Progress"`"
+	./bbcc `echo "${jlinkArg}"` cc -f `echo "$@"` > `echo "${2}Progress"`
 }
 
-export -f process
+export -f ccProcess
 export list
-echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 process "$@" {1} {2}
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 ccProcess "$@" {1} {2}

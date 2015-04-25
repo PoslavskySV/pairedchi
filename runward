@@ -3,11 +3,14 @@
 outputPath="output"
 list=("scalar" "${outputPath}/ward_s.redberry" "axial" "${outputPath}/ward_a.redberry" "tensor" "${outputPath}/ward_t.redberry")
 
-function process(){
-	echo "./bbcc cc -f --ward `echo "$@"` > `echo "${2}Progress"`"
-	# ./bbcc cc -f --ward `echo "$@"` > `echo "${2}Progress"`
+jlinkArg="$@"
+export jlinkArg
+
+function ccwProcess(){
+	echo "./bbcc `echo "${jlinkArg}"` cc -f --ward `echo "$@"` > `echo "${2}Progress"`"
+	./bbcc `echo "${jlinkArg}"` cc -f --ward `echo "$@"` > `echo "${2}Progress"`
 }
 
-export -f process
+export -f ccwProcess
 export list
-echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 process "$@" {1} {2}
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 ccwProcess {1} {2}

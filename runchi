@@ -13,13 +13,15 @@ list=(
 	"tensor" "tensor" "${outputPath}/tt.redberry"
 	)
 
+jlinkArg="$@"
+export jlinkArg
+
 progressFile="${outputPath}/chiProgress"
-function process(){
-	echo ./bbcc chi -f `echo "$@"` `echo "> ${progressFile}"`
-	./bbcc chi -f `echo "$@"` > `echo "${3}Progress"`
+function chiProcess(){
+	echo "./bbcc `echo "${jlinkArg}"` chi -f `echo "$@"` > `echo "${3}Progress"`"
+	./bbcc `echo "${jlinkArg}"` chi -f `echo "$@"` > `echo "${3}Progress"`
 }
 
-export progressFile
-export -f process
+export -f chiProcess
 export list
-echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 3 process "$@" {1} {2} {3}
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 3 chiProcess {1} {2} {3}
