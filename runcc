@@ -13,4 +13,4 @@ function ccProcess(){
 
 export -f ccProcess
 export list
-echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 ccProcess "$@" {1} {2}
+echo ${list[@]} | tr ' ' '\n' | parallel --gnu -N 2 ccProcess {1} {2}

@@ -210,6 +210,7 @@ class SetupCC extends Setup {
                 amp2 <<= stp.mandelstam & stp.massesSubs
                 def r = "ward$bottomSpin$k".t.eq(amp2)
                 output << r.toString(OutputFormat.Redberry)
+                output << '\n'
             }
         }
     }

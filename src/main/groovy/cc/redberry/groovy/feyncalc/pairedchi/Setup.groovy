@@ -405,9 +405,11 @@ class Setup implements AutoCloseable {
             def indexless = part.indexlessSubProduct
             def tensor = part.dataSubProduct
             tensor <<= epsSum & uTrace & mandelstam & dTraceSimplify &
-                    fullSimplify & massesSubs & uSimplify
+                    fullSimplify & massesSubs & uSimplify & massesSubs
             assert TensorUtils.isSymbolic(tensor)
-            return indexless * tensor
+            def res = indexless * tensor
+            res <<= wolframFactorTr
+            return res
         }
     }
 

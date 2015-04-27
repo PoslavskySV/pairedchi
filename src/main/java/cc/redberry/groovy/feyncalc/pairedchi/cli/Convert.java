@@ -53,7 +53,9 @@ public final class Convert implements Process {
     public void run() throws Exception {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
         String line;
-        OutputFormat of = parameters.getOutputFormat();
+        OutputFormat f = parameters.getOutputFormat();
+        String del = f.is(OutputFormat.WolframMathematica) ? ";" : ":";
+        del += "\n";
         while ((line = bufferedReader.readLine()) != null) {
             line = line.trim();
             if (line.isEmpty())
@@ -61,13 +63,17 @@ public final class Convert implements Process {
             if (line.endsWith(";"))
                 line = line.substring(0, line.length() - 1);
             try {
-                System.out.println(Tensors.parse(line).toString(of));
+                System.out.println(Tensors.parse(line).toString(f) + del);
             } catch (Exception e) {
-                System.err.println("Invalid input: " + line);
-                System.err.println(e.getMessage());
+                System.err.println("Invalid input: " + truncate(line) + "...");
+                System.err.println(truncate(e.getMessage()));
                 System.exit(1);
             }
         }
+    }
+
+    public static String truncate(String line) {
+        return line.length() < 100 ? line : line.substring(50);
     }
 
     @Parameters(commandDescription = "Converts Redberry output to Mathematica or Maple",
