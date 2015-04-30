@@ -22,6 +22,7 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
+import cc.redberry.core.tensor.Expression
 import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.tensor.Tensor
@@ -63,7 +64,7 @@ class Setup implements AutoCloseable {
      */
     public Map totalSpinProjector
     /**
-     *
+     * Sum over polarisations
      */
     public Transformation epsSum
 
@@ -71,6 +72,12 @@ class Setup implements AutoCloseable {
     public def mandelstam, massesSubs, momentums,
                dTrace, dTraceSimplify, uTrace, uSimplify, leviSimplify, fullSimplify, fullSimplifyE,
                conjugateSpinors, momentumConservation
+
+    /**
+     * Polarisations
+     */
+    public def polarisations
+
 
     def mathematicaKernel
     public Transformation mFactor, wolframFactorTr
@@ -109,6 +116,9 @@ class Setup implements AutoCloseable {
             setupProjectors()
             setupTransformations()
             setupMathematica()
+            setupPolarisations()
+
+            log 'Setup finished'
         }
     }
 
@@ -130,7 +140,9 @@ class Setup implements AutoCloseable {
         mathematicaKernel.discardAnswer();
 
         def wolframFactor = { tensor ->
-            mathematicaKernel.evaluateToInputForm('Factor[' + tensor.toString(WolframMathematica) + ']', 0).replace('^', '**').t
+            def t = tensor.class == Expression ? tensor[1] : tensor
+            t = mathematicaKernel.evaluateToInputForm('Factor[' + t.toString(WolframMathematica) + ']', 0).replace('^', '**').t
+            return tensor.class == Expression ? tensor[0].eq(t) : t
         }
         wolframFactorTr = wolframFactor as Transformation
         mFactor = Factor[[FactorScalars: false, FactorizationEngine: wolframFactor]]
@@ -347,6 +359,103 @@ class Setup implements AutoCloseable {
                     'p1_m[fl]*p1^m[fl] = m[fl]**2'.t & 'p2_m[fl]*p2^m[fl] = m[fl]**2'.t
 
             return pairVertex = 'B_{aA bB}[fl, k1_m, k2_m]'.t.eq(B)
+        }
+    }
+
+    void setupPolarisations() {
+        log 'Setting up polarizations'
+        polarisations = Identity
+        setupGluonPolarisations()
+        if (projectCC)
+            for (def fl in ['charm', 'bottom'])
+                setupQuarkoniaPolarisations(fl)
+        else setupQuarkoniaPolarisations('bottom')
+    }
+
+    private void setupGluonPolarisations() {
+        use(Redberry) {
+            def eps1 = 'eps1_a = c1 * k1_a + c2 * k2_a + c3 * p_a[bottom]'.t
+            def eps2 = 'eps2_a = c4 * e_abcd * k1^b * k2^c * p^d[bottom]'.t
+            def eq = ["k1_a * eps1^a = 0".t,
+                      "k2_a * eps1^a = 0".t,
+                      'eps1_a * eps1^a = -1'.t,
+                      'eps2_a * eps2^a = -1'.t,
+                      'eps1_a * eps2^a = 0'.t]
+            eq = (eps1 & eps2 & ExpandAndEliminate & leviSimplify &
+                    ExpandAndEliminate & mandelstam & massesSubs) >> eq
+            def options = [ExternalSolver: [
+                    Solver: 'Mathematica',
+                    Path  : '/Applications/Mathematica.app/Contents/MacOS']
+            ]
+
+            def solutions = Reduce(eq, ['c1', 'c2', 'c3', 'c4'].t, options)
+            assert solutions.size() != 0
+            def cc = wolframFactorTr >> solutions[0]
+            eps1 <<= cc; eps2 <<= cc
+
+            for (def g in [1, 2]) {
+                polarisations &= (eps1 & eps2) >> "eps${g}_a[1] = (eps1_a + I * eps2_a)/2**(1/2)".t
+                polarisations &= (eps1 & eps2) >> "eps${g}_a[-1] = (eps1_a - I * eps2_a)/2**(1/2)".t
+            }
+        }
+    }
+
+    private void setupQuarkoniaPolarisations(fl) {
+        use(Redberry) {
+            def eps1 = 'eps1_a = s1 * p_a[charm] + s2 * p_a[bottom]'.t
+            def eps2 = 'eps2_a = s3 * p_a[charm] + s4 * p_a[bottom] + s5 * k1_a'.t
+            def eps0 = 'eps0_a = s6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]'.t
+
+            if (!projectCC) {
+                def subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
+                eps1 <<= subs; eps2 <<= subs; eps0 <<= subs;
+            }
+
+            def eq = ["p_a[$fl] * eps1^a = 0".t,
+                      "p_a[$fl] * eps2^a = 0".t,
+                      "p_a[$fl] * eps0^a = 0".t,
+                      'eps1_a * eps2^a = 0'.t,
+                      'eps1_a * eps1^a = -1'.t,
+                      'eps2_a * eps2^a = -1'.t,
+                      'eps0_a * eps0^a = -1'.t]
+            eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
+                    ExpandAndEliminate & mandelstam & massesSubs) >> eq
+            def options = [ExternalSolver: [
+                    Solver: 'Mathematica',
+                    Path  : '/Applications/Mathematica.app/Contents/MacOS']
+            ]
+
+            def solutions = Reduce(eq, ['s1', 's2', 's3', 's4', 's5', 's6'].t, options)
+            assert solutions.size() != 0
+            def cc = wolframFactorTr >> solutions[0]
+
+            //axial
+            def epsPlus = "eps_a[$fl, 1] = (eps1_a + I * eps2_a)/2**(1/2)".t
+            def epsMinus = "eps_a[$fl, -1] = (eps1_a - I * eps2_a)/2**(1/2)".t
+            def epsZero = "eps_a[$fl, 0] = eps0_a".t
+
+            for (def eps in [epsPlus, epsMinus, epsZero])
+                polarisations &= (eps0 & eps1 & eps2 & cc) >> eps
+
+            def subs = Identity
+            for (def sub in ['eps1_a * eps1_b',
+                             'eps2_a * eps2_b',
+                             'eps1_a * eps2_b',
+                             'eps1_a * eps0_b',
+                             'eps2_a * eps0_b',
+                             'eps0_a * eps0_b'].t) {
+                def rhs = sub
+                rhs <<= eps0 & eps1 & eps2 & cc & fullSimplifyE & massesSubs & mFactor
+                subs &= sub.eq rhs
+            }
+
+            //tensor
+            def tr = epsPlus & epsMinus & epsZero & ExpandAll & subs
+            polarisations &= tr >> "eps_ab[$fl, 2] = eps_a[$fl, 1] * eps_b[$fl, 1]".t
+            polarisations &= tr >> "eps_ab[$fl, 1] = (eps_a[$fl, 1]*eps_b[$fl, 0] + eps_a[$fl, 0]*eps_b[$fl, 1])/2**(1/2)".t
+            polarisations &= tr >> "eps_ab[$fl, 0] = 1/6**(1/2)*eps_a[$fl, 1]*eps_b[$fl, -1] + (2/3)**(1/2)*eps_a[$fl, 0]*eps_b[$fl, 0] + (1/6)**(1/2)*eps_a[$fl, -1]*eps_b[$fl, 1]".t
+            polarisations &= tr >> "eps_ab[$fl, -1] = (eps_a[$fl, -1] * eps_b[$fl, 0] + eps_a[$fl, 0]*eps_b[$fl, -1])/2**(1/2)".t
+            polarisations &= tr >> "eps_ab[$fl, -2] = eps_a[$fl, -1] * eps_b[$fl, -1]".t
         }
     }
 

@@ -226,7 +226,7 @@ class SetupCC extends Setup {
 
             def amp2 = stp.squareMatrixElement(amps.build())
             amp2 <<= stp.mandelstam & stp.massesSubs
-            def r = "r$i".t.eq(amp2)
+            def r = 'r'.t.eq(amp2)
             output << r.toString(OutputFormat.Redberry)
         }
     }

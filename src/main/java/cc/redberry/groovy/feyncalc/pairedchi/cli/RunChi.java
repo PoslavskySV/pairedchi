@@ -48,7 +48,8 @@ public final class RunChi implements Process {
 
     @Override
     public void run() {
-        SetupChi.calc(parameters.getBottomSpin(), parameters.getCharmSpin(), parameters.getOutputFile());
+        //if(parameters.g1 != null && parameters.g)
+        SetupChi.calc(parameters.g1, parameters.g2, parameters.getBottomSpin(), parameters.getCharmSpin(), parameters.getOutputFile());
     }
 
     @Parameters(commandDescription = "Run process g + g -> chi_b + chi_c",
@@ -56,6 +57,11 @@ public final class RunChi implements Process {
     public static final class RunChiParameters extends ProcessParameters {
         @Parameter(description = "bottomSpin charmSpin output_file")
         public List<String> params;
+
+        @Parameter(names = {"--g1"}, description = "First gluon spin (1 or -1)")
+        public Integer g1;
+        @Parameter(names = {"--g2"}, description = "Second gluon spin (1 or -1)")
+        public Integer g2;
 
         @Override
         public String getOutputFileName() {

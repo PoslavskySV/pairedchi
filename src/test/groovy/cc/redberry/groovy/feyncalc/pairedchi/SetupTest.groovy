@@ -238,4 +238,81 @@ class SetupTest {
             }()) == 0.t
         }
     }
+
+    @Test
+    public void testPolarizations1() throws Exception {
+        //gluon polarizations
+        use(Redberry) {
+            def stp = new Setup(true);
+            for (def g in [1, 2]) {
+                def sum = "eps${g}_a[1] * eps${g}_b[-1] + eps${g}_b[1] * eps${g}_a[-1]".t
+                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t
+                assert '2*s**(-1)*k2_{a}*k1_{b}+2*s**(-1)*k2_{b}*k1_{a}-g_{ab}'.t == (stp.mFactor >> sum)
+            }
+        }
+    }
+
+
+    @Test
+    public void testPolarizations1cc() throws Exception {
+        //gluon polarizations
+        use(Redberry) {
+            def stp = new Setup(false, true);
+            for (def g in [1, 2]) {
+                def sum = "eps${g}_a[1] * eps${g}_b[-1] + eps${g}_b[1] * eps${g}_a[-1]".t
+                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & stp.mFactor
+                assert '2*s**(-1)*k2_{a}*k1_{b}+2*s**(-1)*k2_{b}*k1_{a}-g_{ab}'.t == (stp.mFactor >> sum)
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizations2() throws Exception {
+        //axial mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true);
+            for (def fl in ['charm', 'bottom']) {
+                def sum = "eps_a[$fl, 1] * eps_b[$fl, -1] + eps_a[$fl, 0] * eps_b[$fl, 0] + eps_b[$fl, 1] * eps_a[$fl, -1]".t
+                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.mFactor
+
+                def expected = "eps_a[h[$fl]] * eps_b[h[$fl]]".t
+                expected <<= stp.epsSum & stp.massesSubs
+                assert (sum - expected) == 0.t
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizations2cc() throws Exception {
+        //axial mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(false, true);
+            def fl = 'bottom'
+            def sum = "eps_a[$fl, 1] * eps_b[$fl, -1] + eps_a[$fl, 0] * eps_b[$fl, 0] + eps_b[$fl, 1] * eps_a[$fl, -1]".t
+            sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & stp.mFactor
+
+            def expected = "eps_a[h[$fl]] * eps_b[h[$fl]]".t
+            expected <<= stp.epsSum & stp.massesSubs
+            assert (sum - expected) == 0.t
+        }
+    }
+
+
+    @Test
+    public void testPolarizations3() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true, true);
+            for (def fl in ['charm', 'bottom']) {
+                stp.log fl
+                println stp.polarisations >> "eps_ab[$fl, 2]".t
+                def sum = "eps_ab[$fl, 2] * eps_cd[$fl, -2]".t// + eps_ab[$fl, 1] * eps_cd[$fl, -1] + eps_ab[$fl, 0] * eps_cd[$fl, 0] + eps_ab[$fl, -1] * eps_cd[$fl, 1] + eps_ab[$fl, -2] * eps_cd[$fl, 2]".t
+                sum <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.mFactor
+                println sum
+                def expected = "eps_ba[h[$fl]] * eps_cd[h[$fl]]".t
+                expected <<= stp.epsSum & stp.massesSubs & Expand
+                assert (sum - expected) == 0.t
+            }
+        }
+    }
 }

@@ -79,6 +79,7 @@ public class Main {
         } catch (ParameterException e) {
             System.out.println(e.getMessage());
             printProcessHelp(jCommander, process);
+            return;
         }
 
         process.run();
