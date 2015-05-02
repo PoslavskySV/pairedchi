@@ -49,7 +49,7 @@ public final class RunChi implements Process {
     @Override
     public void run() {
         //if(parameters.g1 != null && parameters.g)
-        SetupChi.calc(parameters.g1, parameters.g2, parameters.getBottomSpin(), parameters.getCharmSpin(), parameters.getOutputFile());
+        SetupChi.calc(parameters.g1, parameters.g2, null, null, parameters.getBottomSpin(), parameters.getCharmSpin(), parameters.getOutputFile());
     }
 
     @Parameters(commandDescription = "Run process g + g -> chi_b + chi_c",

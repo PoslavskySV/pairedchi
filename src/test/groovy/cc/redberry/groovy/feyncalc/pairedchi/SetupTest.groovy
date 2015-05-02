@@ -23,6 +23,9 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
+import cc.redberry.core.tensor.FastTensors
+import cc.redberry.core.tensor.Product
+import cc.redberry.core.tensor.Sum
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
@@ -303,15 +306,220 @@ class SetupTest {
         //tensor mesons polarizations
         use(Redberry) {
             def stp = new Setup(true, true);
+            for (def fl in ['bottom']) {
+                def sum = new SumBuilder()
+                def pairs = [["eps_ab[$fl, 2]", "eps_cd[$fl, -2]"].t,
+                             ["eps_ab[$fl, 1]", "eps_cd[$fl, -1]"].t,
+                             ["eps_ab[$fl, 0]", "eps_cd[$fl, 0]"].t,
+                             ["eps_ab[$fl, -1]", "eps_cd[$fl, 1]"].t,
+                             ["eps_ab[$fl, -2]", "eps_cd[$fl, 2]"].t]
+
+                for (def pair in pairs) {
+                    def a = pair[0], b = pair[1]
+                    a <<= stp.polarisations; b <<= stp.polarisations;
+                    for (int i = 0; i < a.size(); ++i)
+                        for (int j = 0; j < b.size(); ++j) {
+                            Product p = a[i] * b[j]
+                            def ind = p.dataSubProduct
+                            ind <<= stp.fullSimplify & stp.massesSubs
+
+                            if (ind.class == Sum)
+                                sum << FastTensors.multiplySumElementsOnFactor(ind, p.indexlessSubProduct)
+                            else
+                                sum << ind * p.indexlessSubProduct
+                        }
+                }
+
+                //eps_ab * eps_cd
+                sum = sum.build()
+                println sum.size()
+
+                sum <<= 'u = 4*mc**2 + 4*mb**2 - s - t'.t & stp.mFactor & stp.mFactor
+                sum.each {
+                    println it
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizations3сс() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(false, true);
+            for (def fl in ['bottom']) {
+                def sum = new SumBuilder()
+                def pairs = [["eps_ab[$fl, 2]", "eps_cd[$fl, -2]"].t,
+                             ["eps_ab[$fl, 1]", "eps_cd[$fl, -1]"].t,
+                             ["eps_ab[$fl, 0]", "eps_cd[$fl, 0]"].t,
+                             ["eps_ab[$fl, -1]", "eps_cd[$fl, 1]"].t,
+                             ["eps_ab[$fl, -2]", "eps_cd[$fl, 2]"].t]
+
+                for (def pair in pairs) {
+                    def a = pair[0], b = pair[1]
+                    a <<= stp.polarisations; b <<= stp.polarisations;
+                    for (int i = 0; i < a.size(); ++i)
+                        for (int j = 0; j < b.size(); ++j) {
+                            Product p = a[i] * b[j]
+                            def ind = p.dataSubProduct
+                            ind <<= stp.fullSimplify & stp.massesSubs
+
+                            if (ind.class == Sum)
+                                sum << FastTensors.multiplySumElementsOnFactor(ind, p.indexlessSubProduct)
+                            else
+                                sum << ind * p.indexlessSubProduct
+                        }
+                }
+
+                //eps_ab * eps_cd
+                sum = sum.build()
+                println sum.size()
+
+                sum <<= stp.mFactor & stp.mFactor
+                sum.each {
+                    println it
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizationsTensorSum() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true, true);
             for (def fl in ['charm', 'bottom']) {
-                stp.log fl
-                println stp.polarisations >> "eps_ab[$fl, 2]".t
-                def sum = "eps_ab[$fl, 2] * eps_cd[$fl, -2]".t// + eps_ab[$fl, 1] * eps_cd[$fl, -1] + eps_ab[$fl, 0] * eps_cd[$fl, 0] + eps_ab[$fl, -1] * eps_cd[$fl, 1] + eps_ab[$fl, -2] * eps_cd[$fl, 2]".t
-                sum <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.mFactor
-                println sum
-                def expected = "eps_ba[h[$fl]] * eps_cd[h[$fl]]".t
-                expected <<= stp.epsSum & stp.massesSubs & Expand
-                assert (sum - expected) == 0.t
+                def pairs = [["eps_ab[$fl, 2]", "eps^ab[$fl, -2]"].t,
+                             ["eps_ab[$fl, 1]", "eps^ab[$fl, -1]"].t,
+                             ["eps_ab[$fl, 0]", "eps^ab[$fl, 0]"].t,
+                             ["eps_ab[$fl, -1]", "eps^ab[$fl, 1]"].t,
+                             ["eps_ab[$fl, -2]", "eps^ab[$fl, 2]"].t]
+
+                for (def pair in pairs) {
+                    def sum = new SumBuilder()
+                    def a = pair[0], b = pair[1]
+                    a <<= stp.polarisations; b <<= stp.polarisations;
+                    for (int i = 0; i < a.size(); ++i)
+                        for (int j = 0; j < b.size(); ++j) {
+                            Product p = a[i] * b[j]
+                            def ind = p.dataSubProduct
+                            ind <<= stp.fullSimplify & stp.massesSubs
+                            sum << p.indexlessSubProduct * ind
+                        }
+
+                    def res = sum.build()
+                    res <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
+                    assert res == 1.t
+                }
+            }
+        }
+    }
+
+
+    @Test
+    public void testPolarizationsTensorSum2() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true, true);
+            for (def fl in ['charm', 'bottom']) {
+
+                for (def l1 in [-2, -1, 0, 1, 2])
+                    for (def l2 in [-2, -1, 0, 1, 2]) {
+                        def sum = new SumBuilder()
+                        def a = "eps_ab[$fl, $l1]".t, b = "eps^ab[$fl, $l2]".t
+                        a <<= stp.polarisations; b <<= stp.polarisations;
+                        for (int i = 0; i < a.size(); ++i)
+                            for (int j = 0; j < b.size(); ++j) {
+                                Product p = a[i] * b[j]
+                                def ind = p.dataSubProduct
+                                ind <<= stp.fullSimplify & stp.massesSubs
+                                sum << p.indexlessSubProduct * ind
+                            }
+                        def res = sum.build()
+                        res <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
+                        if (l1 == -l2)
+                            assert res == 1.t
+                        else
+                            assert res == 0.t
+                    }
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizationsTensorSum2cc() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(false, true);
+            def fl = 'bottom'
+
+            for (def l1 in [-1, 0, 1, 2, -2])
+                for (def l2 in [-1, 0, 1, 2, -2]) {
+                    println "$l1 $l2"
+                    def sum = new SumBuilder()
+                    def a = "eps_ab[$fl, $l1]".t, b = "eps^ab[$fl, $l2]".t
+                    a <<= stp.polarisations; b <<= stp.polarisations;
+                    for (int i = 0; i < a.size(); ++i)
+                        for (int j = 0; j < b.size(); ++j) {
+                            Product p = a[i] * b[j]
+                            def ind = p.dataSubProduct
+                            ind <<= stp.fullSimplify & stp.massesSubs
+                            sum << p.indexlessSubProduct * ind
+                        }
+                    def res = sum.build()
+                    res <<= stp.wolframFactorTr
+                    if (l1 == -l2)
+                        assert res == 1.t
+                    else
+                        assert res == 0.t
+                }
+        }
+    }
+
+    @Test
+    public void testPolarizationsTensorSym() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true, true);
+            for (def fl in ['charm', 'bottom']) {
+
+                for (def l in [-2, -1, 0, 1, 2]) {
+                    def a = "eps_ab[$fl, $l] - eps_ba[$fl, $l]".t
+                    a <<= stp.polarisations & stp.mFactor
+                    assert a == 0.t
+
+                    a = "eps_ab[$fl, $l] * p^a[$fl]".t
+                    a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & stp.mFactor
+                    assert a == 0.t
+
+                    a = "eps_a^a[$fl, $l]".t
+                    a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs
+                    a <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
+                    assert a == 0.t
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testPolarizationsTensorSymcc() throws Exception {
+        //tensor mesons polarizations
+        use(Redberry) {
+            def stp = new Setup(true, true);
+            def fl = 'bottom'
+            for (def l in [-2, -1, 0, 1, 2]) {
+                def a = "eps_ab[$fl, $l] - eps_ba[$fl, $l]".t
+                a <<= stp.polarisations & stp.mFactor
+                assert a == 0.t
+
+                a = "eps_ab[$fl, $l] * p^a[$fl]".t
+                a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & stp.mFactor
+                assert a == 0.t
+
+                a = "eps_a^a[$fl, $l]".t
+                a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs
+                a <<= stp.wolframFactorTr
+                assert a == 0.t
             }
         }
     }
