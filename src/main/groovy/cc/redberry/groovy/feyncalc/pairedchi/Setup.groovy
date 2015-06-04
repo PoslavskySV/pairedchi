@@ -22,10 +22,14 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
-import cc.redberry.core.tensor.*
+import cc.redberry.core.tensor.Expression
+import cc.redberry.core.tensor.Product
+import cc.redberry.core.tensor.SumBuilder
+import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
+import com.wolfram.jlink.KernelLink
 import com.wolfram.jlink.MathLinkFactory
 
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
@@ -79,8 +83,8 @@ class Setup implements AutoCloseable {
     public def polarisations
 
 
-    def mathematicaKernel
-    public Transformation mFactor, wolframFactorTr, mSimplify, wolframSimplifyTr
+    KernelLink mathematicaKernel
+    public Transformation mFactor, wolframFactorTr, mSimplify, wolframSimplifyTr, wolframFactorSqrtTr
 
     public Setup(boolean projectCC) {
         this(projectCC, false)
@@ -124,6 +128,15 @@ class Setup implements AutoCloseable {
         }
     }
 
+    Tensor wolframFunc(String command, Map bindings) {
+        use(Redberry) {
+            bindings.each { k, v ->
+                command = command.replace(k, (v.class == Expression ? v[1] : v).toString(WolframMathematica))
+            }
+            mathematicaKernel.evaluateToInputForm(command, 0).replace('^', '**').t
+        }
+    }
+
     void setupMathematica() {
         log 'Setting up Mathematica'
         String[] args;
@@ -140,19 +153,16 @@ class Setup implements AutoCloseable {
 
         mathematicaKernel = MathLinkFactory.createKernelLink(args)
         mathematicaKernel.discardAnswer();
-
-        def wolframFactor = { tensor ->
-            def t = tensor.class == Expression ? tensor[1] : tensor
-            t = mathematicaKernel.evaluateToInputForm('Factor[' + t.toString(WolframMathematica) + ']', 0).replace('^', '**').t
+        def mop = { tensor, func, bindings ->
+            def t = wolframFunc(func, bindings)
             return tensor.class == Expression ? tensor[0].eq(t) : t
         }
-        def wolframSimplify = { tensor ->
-            def t = tensor.class == Expression ? tensor[1] : tensor
-            t = mathematicaKernel.evaluateToInputForm('Simplify[' + t.toString(WolframMathematica) + ']', 0).replace('^', '**').t
-            return tensor.class == Expression ? tensor[0].eq(t) : t
-        }
+        def wolframFactor = { tensor -> mop(tensor, 'Factor[expr]', [expr: tensor]) }
+        def wolframSimplify = { tensor -> mop(tensor, 'Simplify[expr, Reals]', [expr: tensor]) }
+        def wolframFactorSqrt = { tensor -> mop(tensor, '(expr)/.{Power[x_, y_] :> Power[Factor[Expand[x]], y]}', [expr: tensor]) }
         wolframFactorTr = wolframFactor as Transformation
         wolframSimplifyTr = wolframSimplify as Transformation
+        wolframFactorSqrtTr = wolframFactorSqrt as Transformation
         mFactor = Factor[[FactorScalars: false, FactorizationEngine: wolframFactor]]
         mSimplify = Factor[[FactorScalars: false, FactorizationEngine: wolframSimplify]]
     }
@@ -264,7 +274,7 @@ class Setup implements AutoCloseable {
             /** Full simplification */
             def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam &
                     'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 4".t & "d^A'_A' = 3".t
-            if(projectCC)
+            if (projectCC)
                 simplifyMetrics &= 'e_abcd * p^a[charm] * p^b[bottom] * k1^c * k2^d = 0'.t
 
             fullSimplify = simplifyMetrics &
@@ -273,9 +283,9 @@ class Setup implements AutoCloseable {
                     ExpandAll[simplifyMetrics] & simplifyMetrics
 
             fullSimplifyE = simplifyMetrics &
-                    Expand[simplifyMetrics] & simplifyMetrics &
+                    ExpandTensors[simplifyMetrics] & simplifyMetrics &
                     leviSimplify &
-                    Expand[simplifyMetrics] & simplifyMetrics
+                    ExpandTensors[simplifyMetrics] & simplifyMetrics
 
             dTraceSimplify = DiracTrace[[Gamma: 'G_a', Simplifications: fullSimplify]]
 
@@ -373,18 +383,50 @@ class Setup implements AutoCloseable {
         }
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////// POLARIZATIONS ///////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
     void setupPolarisations() {
         log 'Setting up polarizations'
         polarisations = Identity
+        setupPolarizationCoefficients()
         setupGluonPolarisations()
-        if (projectCC)
-            for (def fl in ['charm', 'bottom'])
-                setupQuarkoniaPolarisations(fl)
-        else setupQuarkoniaPolarisations('bottom')
+        for (def fl in (projectCC ? ['charm', 'bottom'] : ['bottom']))
+            setupQuarkoniaPolarisations(fl)
     }
 
-    void setupGluonPolarisations() {
+    def polarizationCoefficients = Identity
+
+    void setupPolarizationCoefficients() {
         use(Redberry) {
+            if (true && projectCC) {
+                //definitions for x#
+                //def r1 = '16*mb**4 - 4*mb**2*s - 4*mb**2*t - 4*mb**2*u + t*u = x0**(-2)'.t
+                //def r2 = '-4*mb**2 + 8*mb*mc - 4*mc**2 + s = x1**(-2)'.t
+                //def r3 = '-4*mb**2 - 8*mb*mc - 4*mc**2 + s = x2**(-2)'.t
+                //def r4 = '-128*mb**4*mc**2 - 128*mb**2*mc**4 + 16*mb**2*mc**2*s + 16*mb**4*t + 48*mb**2*mc**2*t - 4*mb**2*s*t - 4*mb**2*t**2 + 48*mb**2*mc**2*u + 16*mc**4*u - 4*mc**2*s*u - 4*mb**2*t*u - 4*mc**2*t*u + s*t*u - 4*mc**2*u**2 = x3**(-2)'.t
+                def c1 = 'c1 = (-t+4*mb**2)*x0*s**(-1/2)'.t
+                def c2 = 'c2 = x0*s**(-1/2)*(-u+4*mb**2)'.t
+                def c3 = 'c3 = -x0*s**(1/2)'.t
+                def c4 = 'c4 = -2*x0*s**(-1/2)'.t
+                def cs1 = 'cs1 = -(1/2)*mc**(-1)*x1*x2*(-s+4*mc**2+4*mb**2)'.t
+                def cs2 = 'cs2 = -4*x1*mc*x2'.t
+                def cs3 = 'cs3 = (-I)*(-1)**(-1/2)*x1*x2*x3*(48*mc**2*mb**2-4*mc**2*u-4*mb**2*u-8*t*mb**2+16*mb**4-4*s*mb**2+s*u)'.t
+                def cs4 = 'cs4 = (-I)*(-1)**(-1/2)*x1*x2*(48*mc**2*mb**2-8*mc**2*u-4*t*mc**2+16*mc**4+t*s-4*t*mb**2-4*mc**2*s)*x3'.t
+                def cs5 = 'cs5 = (-I)*x2**(-1)*x1**(-1)*(-1)**(-1/2)*x3'.t
+                def cs6 = 'cs6 = -2*x3'.t
+                def bs1 = 'bs1 = -4*mb*x1*x2'.t
+                def bs2 = 'bs2 = -(1/2)*mb**(-1)*x1*x2*(-s+4*mc**2+4*mb**2)'.t
+                def bs3 = 'bs3 = (-I)*(-1)**(-1/2)*x1*x2*x3*(48*mc**2*mb**2-4*mc**2*u-4*mb**2*u-8*t*mb**2+16*mb**4-4*s*mb**2+s*u)'.t
+                def bs4 = 'bs4 = (-I)*(-1)**(-1/2)*x1*x2*(48*mc**2*mb**2-8*mc**2*u-4*t*mc**2+16*mc**4+t*s-4*t*mb**2-4*mc**2*s)*x3'.t
+                def bs5 = 'bs5 = (-I)*x2**(-1)*x1**(-1)*(-1)**(-1/2)*x3'.t
+                def bs6 = 'bs6 = -2*x3'.t
+                polarizationCoefficients &= c1 & c2 & c3 & c4 & cs1 & cs2 & cs3 & cs4 & cs5 & cs6 & bs1 & bs2 & bs3 & bs4 & bs5 & bs6
+                return
+            }
+
+            log 'solving equations for gluon polarizations'
             def eps1 = 'eps1_a = c1 * k1_a + c2 * k2_a + c3 * p_a[bottom]'.t
             def eps2 = 'eps2_a = c4 * e_abcd * k1^b * k2^c * p^d[bottom]'.t
             def eq = ["k1_a * eps1^a = 0".t,
@@ -398,12 +440,45 @@ class Setup implements AutoCloseable {
                     Solver: 'Mathematica',
                     Path  : '/Applications/Mathematica.app/Contents/MacOS']
             ]
-
             def solutions = Reduce(eq, ['c1', 'c2', 'c3', 'c4'].t, options)
             assert solutions.size() != 0
-            def cc = wolframFactorTr >> solutions[0]
-            eps1 <<= cc; eps2 <<= cc
+            polarizationCoefficients &= (wolframFactorTr & wolframFactorSqrtTr) >> solutions[0]
 
+            for (def fl in (projectCC ? ['charm', 'bottom'] : ['bottom'])) {
+                log "solving equations for ${fl}onium"
+                def var = fl[0] + 's'
+                eps1 = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t
+                eps2 = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t
+                def eps0 = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t
+
+                if (!projectCC) {
+                    def subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
+                    eps1 <<= subs; eps2 <<= subs; eps0 <<= subs;
+                }
+
+                eq = ["p_a[$fl] * eps1^a = 0".t,
+                      "p_a[$fl] * eps2^a = 0".t,
+                      "p_a[$fl] * eps0^a = 0".t,
+                      'eps1_a * eps2^a = 0'.t,
+                      'eps1_a * eps1^a = -1'.t,
+                      'eps2_a * eps2^a = -1'.t,
+                      'eps0_a * eps0^a = -1'.t]
+                eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
+                        ExpandAndEliminate & mandelstam & massesSubs) >> eq
+
+                solutions = Reduce(eq, ["${var}1", "${var}2", "${var}3", "${var}4", "${var}5", "${var}6"].t, options)
+                assert solutions.size() != 0
+                polarizationCoefficients &= (wolframFactorTr & wolframFactorSqrtTr) >> solutions[0]
+            }
+        }
+    }
+
+    void setupGluonPolarisations() {
+        log 'Setting up gluon polarisations'
+        use(Redberry) {
+            def eps1 = 'eps1_a = c1 * k1_a + c2 * k2_a + c3 * p_a[bottom]'.t
+            def eps2 = 'eps2_a = c4 * e_abcd * k1^b * k2^c * p^d[bottom]'.t
+            eps1 <<= polarizationCoefficients; eps2 <<= polarizationCoefficients
             for (def g in [1, 2]) {
                 polarisations &= (eps1 & eps2) >> "eps${g}_a[1] = (eps1_a + I * eps2_a)/2**(1/2)".t
                 polarisations &= (eps1 & eps2) >> "eps${g}_a[-1] = (eps1_a - I * eps2_a)/2**(1/2)".t
@@ -413,34 +488,15 @@ class Setup implements AutoCloseable {
 
     void setupQuarkoniaPolarisations(fl) {
         use(Redberry) {
-            def eps1 = 'eps1_a = s1 * p_a[charm] + s2 * p_a[bottom]'.t
-            def eps2 = 'eps2_a = s3 * p_a[charm] + s4 * p_a[bottom] + s5 * k1_a'.t
-            def eps0 = 'eps0_a = s6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]'.t
+            log "Setting up quarkonia  polarisations ($fl)"
+            def var = fl[0] + 's'
+            def eps1 = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t
+            def eps2 = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t
+            def eps0 = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t
 
             if (!projectCC) {
                 def subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
                 eps1 <<= subs; eps2 <<= subs; eps0 <<= subs;
-            }
-
-            def eq = ["p_a[$fl] * eps1^a = 0".t,
-                      "p_a[$fl] * eps2^a = 0".t,
-                      "p_a[$fl] * eps0^a = 0".t,
-                      'eps1_a * eps2^a = 0'.t,
-                      'eps1_a * eps1^a = -1'.t,
-                      'eps2_a * eps2^a = -1'.t,
-                      'eps0_a * eps0^a = -1'.t]
-            eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
-                    ExpandAndEliminate & mandelstam & massesSubs) >> eq
-            def options = [ExternalSolver: [
-                    Solver: 'Mathematica',
-                    Path  : '/Applications/Mathematica.app/Contents/MacOS']
-            ]
-
-            def solutions = Reduce(eq, ['s1', 's2', 's3', 's4', 's5', 's6'].t, options)
-            assert solutions.size() != 0
-            def cc = wolframFactorTr >> solutions[0]
-            for(def c in cc){
-                println c.toString(WolframMathematica)
             }
 
             //axial
@@ -449,7 +505,7 @@ class Setup implements AutoCloseable {
             def epsZero = "eps_a[$fl, 0] = eps0_a".t
 
             for (def eps in [epsPlus, epsMinus, epsZero])
-                polarisations &= (eps0 & eps1 & eps2 & cc) >> eps
+                polarisations &= (eps0 & eps1 & eps2 & polarizationCoefficients) >> eps
 
             def subs = Identity
             for (def sub in ['eps1_a * eps1_b',
@@ -459,23 +515,12 @@ class Setup implements AutoCloseable {
                              'eps2_a * eps0_b',
                              'eps0_a * eps0_b'].t) {
                 def rhs = sub
-                rhs <<= eps0 & eps1 & eps2 & cc & fullSimplifyE & massesSubs & mFactor
+                rhs <<= eps0 & eps1 & eps2 & polarizationCoefficients & fullSimplifyE & massesSubs & mFactor
                 subs &= sub.eq rhs
             }
 
-            def expandFactor = { Tensor expr ->
-                expr.transformParentAfterChild { s ->
-                    if (s.class != Product)
-                        return s
-                    Product p = s
-                    if (p.dataSubProduct.class == Sum)
-                        return FastTensors.multiplySumElementsOnFactor(p.dataSubProduct, p.indexlessSubProduct)
-                    return s
-                }
-            } as Transformation
-
             //tensor
-            def tr = epsPlus & epsMinus & epsZero & ExpandAll & subs & expandFactor & mFactor
+            def tr = epsPlus & epsMinus & epsZero & ExpandAll & subs & ExpandTensors & mFactor
             polarisations &= tr >> "eps_ab[$fl, 2] = eps_a[$fl, 1] * eps_b[$fl, 1]".t
             polarisations &= tr >> "eps_ab[$fl, 1] = (eps_a[$fl, 1]*eps_b[$fl, 0] + eps_a[$fl, 0]*eps_b[$fl, 1])/2**(1/2)".t
             polarisations &= tr >> "eps_ab[$fl, 0] = 1/6**(1/2)*eps_a[$fl, 1]*eps_b[$fl, -1] + (2/3)**(1/2)*eps_a[$fl, 0]*eps_b[$fl, 0] + (1/6)**(1/2)*eps_a[$fl, -1]*eps_b[$fl, 1]".t
@@ -485,7 +530,7 @@ class Setup implements AutoCloseable {
     }
 
     Transformation setPolarizations(def g1, def g2, def charmPol, def bottomPol,
-                                           String bottomSpin, String charmSpin) {
+                                    String bottomSpin, String charmSpin) {
         use(Redberry) {
             checkPol g1
             checkPol g2
@@ -497,15 +542,15 @@ class Setup implements AutoCloseable {
                 subs &= "h1 = $g1".t
             if (g1 != null)
                 subs &= "h2 = $g2".t
-            if (charmPol != null) {
-                subs &= "eps_a[h[charm]] = eps_a[charm, $charmPol]".t.hold
-                subs &= "eps_ab[h[charm]] = eps_ab[charm, $charmPol]".t.hold
-            }
-            if (bottomPol != null) {
-                subs &= "eps_a[h[bottom]] = eps_a[bottom, $bottomPol]".t.hold
-                subs &= "eps_ab[h[bottom]] = eps_ab[bottom, $bottomPol]".t.hold
-            }
-            if ([g1, g2, charmPol, bottomPol].any { it != null })
+//            if (charmPol != null) {
+//                subs &= "eps_a[h[charm]] = eps_a[charm, $charmPol]".t.hold
+//                subs &= "eps_ab[h[charm]] = eps_ab[charm, $charmPol]".t.hold
+//            }
+//            if (bottomPol != null) {
+//                subs &= "eps_a[h[bottom]] = eps_a[bottom, $bottomPol]".t.hold
+//                subs &= "eps_ab[h[bottom]] = eps_ab[bottom, $bottomPol]".t.hold
+//            }
+//            if ([g1, g2, charmPol, bottomPol].any { it != null })
                 subs &= polarisations
 
             return subs

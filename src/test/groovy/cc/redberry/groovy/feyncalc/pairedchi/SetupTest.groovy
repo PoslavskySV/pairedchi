@@ -23,6 +23,7 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
+import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.FastTensors
 import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.Sum
@@ -69,6 +70,18 @@ class SetupTest {
             def stp = new Setup(false)
             def t = stp.taylor('q_i') >> 'q_i*k^i'.t
             assert t == 'q_i*k^i'.t
+        }
+    }
+
+    @Test
+    public void testMathematica() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(false, false, false)
+            def t = '(Sin[x]*Sin[y] - Cos[x]*Cos[y])*g_mn + Cos[x+y]*g_mn'.t
+            assert stp.mSimplify >> t == 0.t
+
+            t = 'a*c + I*b*c - I*a*d + b*d'.t
+            println stp.mFactor >> t
         }
     }
 
@@ -520,6 +533,79 @@ class SetupTest {
                 a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs
                 a <<= stp.wolframFactorTr
                 assert a == 0.t
+            }
+        }
+    }
+
+    @Test
+    public void testPols() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(true, true);
+            def f = '(-4096*I)*u**(-1)*mb**2*g**4*(-u+4*mb**2)**(-2)*(-u+4*mc**2)**(-2)*mc**2*g_{AB}'.t
+            def t = 'eps2^{g}[h2]*eps1^{a}[h1]*k1^{i}*k2^{e}*p_{g}[charm]*p_{a}[charm]*eps_{ic}[h[bottom]]*eps_{e}^{c}[h[charm]]'.t
+
+            def pols = stp.setPolarizations(1, 1, 2, 2, 'tensor', 'tensor')
+            def simpl = stp.massesSubs & 'k1^{b}*e^{a}_{bfd}*k2^{f}*p_{a}[charm]*p^{d}[bottom] = 0'.t
+            println pols
+            t <<= pols
+            println 'subs'
+            t <<= ExpandTensors[EliminateMetrics & stp.mandelstam & simpl] & stp.mandelstam & simpl
+            println 'expand'
+            t <<= stp.leviSimplify & simpl
+            println 'levi'
+            t <<= ExpandTensors[EliminateMetrics & stp.mandelstam & simpl] & stp.mandelstam & simpl
+            println 'levi'
+
+
+            println TensorUtils.getAllDiffSimpleTensors(t)
+            println TensorUtils.isSymbolic(t)
+            t <<= stp.gluonsPolarizationCoefficients
+            t <<= stp.chiPolarizationCoefficients['charm']
+            println stp.wolframSimplifyTr >> t
+        }
+    }
+
+    @Test
+    public void testPolarizationCoefficients() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(true, true)
+            def r1 = '16*mb**4 - 4*mb**2*s - 4*mb**2*t - 4*mb**2*u + t*u = x0**(-2)'.t
+            def r2 = '-4*mb**2 + 8*mb*mc - 4*mc**2 + s = x1**(-2)'.t
+            def r3 = '-4*mb**2 - 8*mb*mc - 4*mc**2 + s = x2**(-2)'.t
+            def r4 = '-128*mb**4*mc**2 - 128*mb**2*mc**4 + 16*mb**2*mc**2*s + 16*mb**4*t + 48*mb**2*mc**2*t - 4*mb**2*s*t - 4*mb**2*t**2 + 48*mb**2*mc**2*u + 16*mc**4*u - 4*mc**2*s*u - 4*mb**2*t*u - 4*mc**2*t*u + s*t*u - 4*mc**2*u**2 = x3**(-2)'.t
+            def subs = r1 & r2 & r3 & r4 & PowerExpand
+
+            stp.polarizationCoefficients.each {
+                println it
+//                def t = it
+//                if (t instanceof Tensor) {
+//                    t <<= subs
+//                    println('def ' + t[0] + ' = \'' + t + '\'.t')
+//                }
+            }
+
+            stp.polarisations.each {
+                println it
+            }
+        }
+    }
+
+    @Test
+    public void testxxxx() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(true, true, false)
+            def t = 'mb**(-2)*(-1)**(-1/2)*((-1/8*I)*(2*mb*s*t*x3-s+4*mc**2+4*mb**2-8*mc**2*mb*s*x3+32*mc**4*mb*x3-8*mc**2*mb*t*x3-16*mc**2*mb*x3*u+96*mc**2*mb**3*x3-8*mb**3*t*x3)*x1**2*(2*mb*s*t*x3+s-4*mc**2-4*mb**2-8*mc**2*mb*s*x3+32*mc**4*mb*x3-8*mc**2*mb*t*x3-16*mc**2*mb*x3*u+96*mc**2*mb**3*x3-8*mb**3*t*x3)*x2**2+(1/2)*mb*(-s+4*mc**2+4*mb**2)*x3*x1**2*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x2**2)*p_{a}[bottom]*p_{b}[bottom]+((-1/2*I)*(-4*mc**2*x3*u+4*mb+s*x3*u-4*mb**2*s*x3+48*mc**2*mb**2*x3-4*mb**2*x3*u+16*mb**4*x3-8*mb**2*t*x3)*(-4*mc**2*x3*u-4*mb+s*x3*u-4*mb**2*s*x3+48*mc**2*mb**2*x3-4*mb**2*x3*u+16*mb**4*x3-8*mb**2*t*x3)*x1**2*x2**2+4*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*mb*x3*x1**2*x2**2)*(-1)**(-1/2)*p_{a}[charm]*p_{b}[charm]+((-1/2*I)*mb*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x3**2+(1/4)*(-s+4*mc**2+4*mb**2)*x3)*mb**(-1)*(-1)**(-1/2)*p_{b}[bottom]*k1_{a}+((-1/2*I)*mb*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x3**2+(1/4)*(-s+4*mc**2+4*mb**2)*x3)*mb**(-1)*(-1)**(-1/2)*p_{a}[bottom]*k1_{b}+((-1/2*I)*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*x3**2+2*mb*x3)*(-1)**(-1/2)*p_{b}[charm]*k1_{a}+((-1/2*I)*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*x3**2+2*mb*x3)*(-1)**(-1/2)*p_{a}[charm]*k1_{b}+mb**(-1)*(-1)**(-1/2)*((1/4)*x3*x1**2*(-96*mc**2*mb**2*u-16*mb**4*u+8*mc**2*s*u+4*s**2*mb**2+320*mc**4*mb**2+640*mc**2*mb**4+64*mb**6-s**2*u-16*mc**4*u-96*mc**2*mb**2*s-32*mb**4*s+16*mb**2*s*t-64*mc**2*mb**2*t-64*mb**4*t+8*mb**2*s*u)*x2**2+(-1/2*I)*(32*u**2*mc**4*x3**2+32*mb**4*t**2*x3**2-320*mc**2*mb**4*u*x3**2+32*mc**2*mb**2*t**2*x3**2+32*mc**4*s*u*x3**2-640*mc**4*mb**2*u*x3**2+s**2*t*u*x3**2-8*mb**2*s*t**2*x3**2+32*u**2*mc**2*mb**2*x3**2-8*mc**2*s*t*u*x3**2-8*u**2*mc**2*s*x3**2-320*mc**4*mb**2*t*x3**2-256*mc**2*mb**4*s*x3**2-256*mc**4*mb**2*s*x3**2+16*mb**4*t*u*x3**2-640*mc**2*mb**4*t*x3**2-8*mc**2+768*mc**2*mb**6*x3**2+768*mc**6*mb**2*x3**2-64*mb**6*t*x3**2+96*mc**2*mb**2*t*u*x3**2-8*mb**2+96*mc**2*mb**2*s*u*x3**2-64*mc**6*u*x3**2+16*s**2*mc**2*mb**2*x3**2+2*s-4*s**2*mb**2*t*x3**2-4*s**2*mc**2*u*x3**2+96*mc**2*mb**2*s*t*x3**2+2560*mc**4*mb**4*x3**2+32*mb**4*s*t*x3**2+16*mc**4*t*u*x3**2-8*mb**2*s*t*u*x3**2)*mb*x1**2*x2**2)*p_{a}[bottom]*p_{b}[charm]+mb**(-1)*(-1)**(-1/2)*((1/4)*x3*x1**2*(-96*mc**2*mb**2*u-16*mb**4*u+8*mc**2*s*u+4*s**2*mb**2+320*mc**4*mb**2+640*mc**2*mb**4+64*mb**6-s**2*u-16*mc**4*u-96*mc**2*mb**2*s-32*mb**4*s+16*mb**2*s*t-64*mc**2*mb**2*t-64*mb**4*t+8*mb**2*s*u)*x2**2+(-1/2*I)*(32*u**2*mc**4*x3**2+32*mb**4*t**2*x3**2-320*mc**2*mb**4*u*x3**2+32*mc**2*mb**2*t**2*x3**2+32*mc**4*s*u*x3**2-640*mc**4*mb**2*u*x3**2+s**2*t*u*x3**2-8*mb**2*s*t**2*x3**2+32*u**2*mc**2*mb**2*x3**2-8*mc**2*s*t*u*x3**2-8*u**2*mc**2*s*x3**2-320*mc**4*mb**2*t*x3**2-256*mc**2*mb**4*s*x3**2-256*mc**4*mb**2*s*x3**2+16*mb**4*t*u*x3**2-640*mc**2*mb**4*t*x3**2-8*mc**2+768*mc**2*mb**6*x3**2+768*mc**6*mb**2*x3**2-64*mb**6*t*x3**2+96*mc**2*mb**2*t*u*x3**2-8*mb**2+96*mc**2*mb**2*s*u*x3**2-64*mc**6*u*x3**2+16*s**2*mc**2*mb**2*x3**2+2*s-4*s**2*mb**2*t*x3**2-4*s**2*mc**2*u*x3**2+96*mc**2*mb**2*s*t*x3**2+2560*mc**4*mb**4*x3**2+32*mb**4*s*t*x3**2+16*mc**4*t*u*x3**2-8*mb**2*s*t*u*x3**2)*mb*x1**2*x2**2)*p_{a}[charm]*p_{b}[bottom]-(1/2)*x1**(-2)*x3**2*x2**(-2)*k1_{a}*k1_{b}'.t
+            println TensorUtils.info(t)
+            println t
+            println(t << (ExpandAll & stp.mFactor))
+
+            t.each {
+                println ''
+                println it
+                if (it.class == Product) {
+                    println it.indexlessSubProduct//.toString(OutputFormat.WolframMathematica)
+                    println it.dataSubProduct
+                }
             }
         }
     }
