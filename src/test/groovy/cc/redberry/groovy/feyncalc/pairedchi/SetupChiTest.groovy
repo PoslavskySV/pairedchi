@@ -75,8 +75,9 @@ class SetupChiTest {
                 Mt += n / d
             }
 
+            Mt <<= 'x0 = 1'.t
             def Mtc = (Conjugate & InvertIndices) >> Mt
-
+            def x02 = 'x0**2 = s/(16*mb**4 - 4*mb**2*s - 4*mb**2*t - 4*mb**2*u + t*u)'.t
             def res = 0.t
             for (int i = 0; i < Mt.size(); ++i)
                 for (int j = 0; j < Mt.size(); ++j) {
@@ -87,12 +88,12 @@ class SetupChiTest {
                     println d
                     def n = Numerator >> term
                     n <<= ExpandTensors[EliminateMetrics] & stp.epsSum & stp.mandelstam &
-                            stp.fullSimplifyE & stp.massesSubs & stp.mFactor
-
+                            stp.fullSimplifyE & stp.massesSubs
                     //d <<= stp.fullSimplify & stp.massesSubs & stp.mFactor
                     res += n / d
                 }
 
+            res <<= 'u = 4*mc**2 + 4*mb**2 - s - t'.t & stp.wolframFactorTr
             println TensorUtils.info(res)
             println res.toString(OutputFormat.WolframMathematica)
         }

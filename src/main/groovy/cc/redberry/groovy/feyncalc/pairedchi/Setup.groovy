@@ -406,10 +406,12 @@ class Setup implements AutoCloseable {
                 //def r2 = '-4*mb**2 + 8*mb*mc - 4*mc**2 + s = x1**(-2)'.t
                 //def r3 = '-4*mb**2 - 8*mb*mc - 4*mc**2 + s = x2**(-2)'.t
                 //def r4 = '-128*mb**4*mc**2 - 128*mb**2*mc**4 + 16*mb**2*mc**2*s + 16*mb**4*t + 48*mb**2*mc**2*t - 4*mb**2*s*t - 4*mb**2*t**2 + 48*mb**2*mc**2*u + 16*mc**4*u - 4*mc**2*s*u - 4*mb**2*t*u - 4*mc**2*t*u + s*t*u - 4*mc**2*u**2 = x3**(-2)'.t
-                def c1 = 'c1 = (-t+4*mb**2)*x0*s**(-1/2)'.t
-                def c2 = 'c2 = x0*s**(-1/2)*(-u+4*mb**2)'.t
-                def c3 = 'c3 = -x0*s**(1/2)'.t
-                def c4 = 'c4 = -2*x0*s**(-1/2)'.t
+                //x0 -> x0/sqrt(s)
+                //def x0 = 'x0**2 = s/(16*mb**4 - 4*mb**2*s - 4*mb**2*t - 4*mb**2*u + t*u)'.t
+                def c1 = 'c1 = (-t+4*mb**2)*x0'.t
+                def c2 = 'c2 = x0*(-u+4*mb**2)'.t
+                def c3 = 'c3 = -x0*s'.t
+                def c4 = 'c4 = -2*x0'.t
                 def cs1 = 'cs1 = -(1/2)*mc**(-1)*x1*x2*(-s+4*mc**2+4*mb**2)'.t
                 def cs2 = 'cs2 = -4*x1*mc*x2'.t
                 def cs3 = 'cs3 = (-I)*(-1)**(-1/2)*x1*x2*x3*(48*mc**2*mb**2-4*mc**2*u-4*mb**2*u-8*t*mb**2+16*mb**4-4*s*mb**2+s*u)'.t
@@ -480,8 +482,8 @@ class Setup implements AutoCloseable {
             def eps2 = 'eps2_a = c4 * e_abcd * k1^b * k2^c * p^d[bottom]'.t
             eps1 <<= polarizationCoefficients; eps2 <<= polarizationCoefficients
             for (def g in [1, 2]) {
-                polarisations &= (eps1 & eps2) >> "eps${g}_a[1] = (eps1_a + I * eps2_a)/2**(1/2)".t
-                polarisations &= (eps1 & eps2) >> "eps${g}_a[-1] = (eps1_a - I * eps2_a)/2**(1/2)".t
+                polarisations &= (eps1 & eps2) >> "eps${g}_a[1] = eps1_a".t//(eps1_a + I * eps2_a)/2**(1/2)".t
+                polarisations &= (eps1 & eps2) >> "eps${g}_a[-1] = eps2_a".t//(eps1_a - I * eps2_a)/2**(1/2)".t
             }
         }
     }
