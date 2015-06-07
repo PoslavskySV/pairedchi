@@ -30,7 +30,7 @@ class SetupChiTest {
                             def ward = ("eps${i}_i[h${i}] = k${i}_i".t
                                     & "k${3 - i}_i = p_i[bottom] - k${i}_i + p_i[charm]".t
                             ) >> M
-                            ward <<= stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 - s - t'.t & stp.mFactor
+                            ward <<= stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 - s - t'.t & stp.wFactor
                             ward
                         }()) == 0.t
                 }
@@ -68,10 +68,10 @@ class SetupChiTest {
             for (def M in [Ma, Mb]) {
                 M <<= stp.FeynmanRules & stp.qVertices & stp.mandelstam
                 def n = Numerator >> M
-                n <<= stp.fullSimplify & stp.massesSubs & stp.mFactor
-                n <<= pols & stp.fullSimplifyE & stp.massesSubs & stp.mFactor
+                n <<= stp.fullSimplify & stp.massesSubs & stp.wFactor
+                n <<= pols & stp.fullSimplifyE & stp.massesSubs & stp.wFactor
                 def d = Denominator >> M
-                d <<= stp.fullSimplify & stp.massesSubs & stp.mFactor
+                d <<= stp.fullSimplify & stp.massesSubs & stp.wFactor
                 Mt += n / d
             }
 
@@ -89,7 +89,7 @@ class SetupChiTest {
                     def n = Numerator >> term
                     n <<= ExpandTensors[EliminateMetrics] & stp.epsSum & stp.mandelstam &
                             stp.fullSimplifyE & stp.massesSubs
-                    //d <<= stp.fullSimplify & stp.massesSubs & stp.mFactor
+                    //d <<= stp.fullSimplify & stp.massesSubs & stp.wFactor
                     res += n / d
                 }
 

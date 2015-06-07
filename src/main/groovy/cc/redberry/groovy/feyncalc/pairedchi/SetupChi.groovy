@@ -43,7 +43,7 @@ class SetupChi extends Setup {
     SetupChi() {
         super(true, true);
         use(Redberry) {
-            qVertices = effectiveQuarkoniaVertices().values().collect({ x -> x << (Together & mFactor) }) as Transformation
+            qVertices = effectiveQuarkoniaVertices().values().collect({ x -> x << (Together & wFactor) }) as Transformation
         }
     }
 
@@ -71,7 +71,7 @@ class SetupChi extends Setup {
             //total matrix element
             def M = Ma + Mb
             M <<= momentumConservation
-            M <<= massesSubs & mFactor
+            M <<= massesSubs & wFactor
 
             log '...done'
             return (diagrams[charmSpin + bottomSpin] = M)
@@ -95,7 +95,7 @@ class SetupChi extends Setup {
                 println t
                 t *= 'g^AB'.t
                 t <<= pols
-                t <<= stp.fullSimplifyE & stp.massesSubs & stp.mFactor
+                t <<= stp.fullSimplifyE & stp.massesSubs & stp.wFactor
                 sss << t
 
                 println(c++)

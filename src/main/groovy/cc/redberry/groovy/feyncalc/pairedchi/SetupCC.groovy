@@ -24,6 +24,7 @@ package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
 import cc.redberry.core.context.OutputFormat
+import cc.redberry.core.tensor.Sum
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
@@ -59,13 +60,70 @@ class SetupCC extends Setup {
             spinorsSimplify = Identity
             spinorsSimplify &= 'cu[p1_m[charm]]*G_a*p1^a[charm] = m[charm]*cu[p1_m[charm]]'.t
             spinorsSimplify &= 'G_a*p2^a[charm]*v[p2_m[charm]] = -m[charm]*v[p2_m[charm]]'.t
-            dSimplify = Identity
-            dSimplify &= 'G_a*G^a = 4'.t
-            dSimplify &= 'G_a*G_b*G^a = -2*G_b'.t
-            dSimplify &= 'G_a*G_b*G_c*G^a = 4*g_bc'.t
 
             gcc = 'Vcc_iI = G_ij[p1_m[charm] + p2_m[charm]]*cu[p1_m[charm]]*V^j_I*v[p2_m[charm]]'.t
             gcc <<= FeynmanRules & fullSimplify
+        }
+    }
+
+    def diagrams(bottomSpin) {
+        use(Redberry) {
+            def diagrams = []
+            //gluon diagrams
+            //cu[p1_m[fl]]*(V_aA*D[p1_m[fl] - k1_m, m[fl]]*V_bB + V_bB*D[p1_m[fl] - k2_m, m[fl]]*V_aA)*v[p2_m[fl]]
+            def glMa = """eps1^a[h1] * B_{aA cC}[charm, k1_i, k2_i - p_i[bottom]]
+                        * G^cd[-k2_i + p_i[bottom]] * g^CD
+                        * eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]""".t
+            def glMb = """eps2^b[h2] * B_{bB cC}[charm, k2_i, k1_i - p_i[bottom]]
+                        * G^cd[-k1_i + p_i[bottom]] * g^CD
+                        * eps1^a[h1] * A${bottomSpin}_{dD aA}[bottom, -k1_i + p_i[bottom], k1_i]""".t
+            diagrams += [glMa, glMb]
+
+            //3-gluion diagrams
+            def gl3Ma = """eps1^a[h1] * Vcc^cC * V_{cC aA dD}[-p1_a[charm] - p2_a[charm], k1_a, k2_a - p_a[bottom]]
+                        * G^de[-k2_a + p_a[bottom]]*g^DE
+                        * A${bottomSpin}_{eE bB}[bottom, -k2_a + p_a[bottom], k2_a] * eps2^b[h2]""".t
+            def gl3Mb = """eps2^b[h2] * Vcc^cC * V_{cC bB dD}[-p1_a[charm] - p2_a[charm], k2_a, k1_a - p_a[bottom]]
+                        * G^ed[-k1_a + p_a[bottom]]*g^ED
+                        * A${bottomSpin}_{eE aA}[bottom, -k1_a + p_a[bottom], k1_a] * eps1^a[h1]""".t
+            //third diagram (s-chanel)
+            def gl3Mc = """eps1^a[h1] * eps2^b[h2] * V_{aA bB cC}[k1_a, k2_a, -k1_a - k2_a]
+                        * G^cd[k1_a + k2_a]*g^CD
+                        * A${bottomSpin}_{dD eE}[bottom, k1_a + k2_a, -p1_a[charm] - p2_a[charm]] * Vcc^eE""".t
+//            diagrams += [gl3Ma, gl3Mb, gl3Mc]
+
+            //quark diagrams
+            // (1,2,3)
+            def qMa = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
+            // (3,2,1)
+            def qMb = 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_bB*eps2^b[h2]*D[-pCharm_m - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
+            // (1,3,2)
+            def qMc = 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_cC*Vcc^cC*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
+            // (3,1,2)
+            def qMd = 'cu[p1_m[bottom]]*V_bB*eps2^b[h2]*D[p1_m[bottom] - k2_m, m[bottom]]*V_aA*eps1^a[h1]*D[-pCharm_m - p2_m[bottom], m[bottom]]*V_cC*Vcc^cC*v[p2_m[bottom]]'.t
+            // (2,3,1)
+            def qMe = 'cu[p1_m[bottom]]*V_aA*eps1^a[h1]*D[p1_m[bottom] - k1_m, m[bottom]]*V_cC*Vcc^cC*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
+            // (2,1,3)
+            def qMf = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_aA*eps1^a[h1]*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
+
+            for (def qM in [qMa, qMb, qMc, qMd, qMe, qMf]) {
+//                diagrams += calcQAmp('pCharm_m = p1_m[charm] + p2_m[charm]'.t >> qM, bottomSpin)
+            }
+            diagrams = diagrams.collect({ it << ccVertex })
+            return diagrams
+        }
+    }
+
+    def calcQAmp(Tensor amp, bottomSpin) {
+        use(Redberry) {
+            amp <<= FeynmanRules
+            amp <<= spinSingletProjector['bottom'] & dTraceSimplify &
+                    'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t &
+                    'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+            amp <<= momentums['bottom'] & 'q_i[bottom] = q_i'.t.hold & taylor('q_i') & 'q_i = q_i[bottom]'.t
+            amp <<= EliminateMetrics & mandelstam
+            amp <<= totalSpinProjector[bottomSpin]
+            return amp.class == Sum ? amp.toList() : [amp]
         }
     }
 
@@ -88,7 +146,7 @@ class SetupCC extends Setup {
             Mb *= simplify >> "eps1^a[h1] * A${bottomSpin}_{dD aA}[bottom, -k1_i + p_i[bottom], k1_i]".t
 
             def M = Ma + Mb
-            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+            M <<= fullSimplify & massesSubs & wFactor & spinorsSimplify & massesSubs & wFactor
 
             log "... done"
             return (gluonDiagrams[bottomSpin] = M)
@@ -126,10 +184,10 @@ class SetupCC extends Setup {
 
             log 'simplifying ...'
             def M = Ma + Mb + Mc
-            M <<= fullSimplify & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
-            M <<= (gcc << (massesSubs & mFactor))
+            M <<= fullSimplify & massesSubs & wFactor & spinorsSimplify & massesSubs & wFactor
+            M <<= (gcc << (massesSubs & wFactor))
             log 'simplifying ...'
-            M <<= fullSimplifyE & massesSubs & mFactor & spinorsSimplify & massesSubs & mFactor
+            M <<= fullSimplifyE & massesSubs & wFactor & spinorsSimplify & massesSubs & wFactor
 
             log "... done"
             return (gluon3Diagrams[bottomSpin] = M)
@@ -180,11 +238,11 @@ class SetupCC extends Setup {
             if (bottomSpin == 'axial')
                 Mc <<= momentumConservation
             log 'simplifying ...'
-            Mc <<= fullSimplify & massesSubs & mFactor
-            Mc <<= (gcc << (massesSubs & mFactor))
+            Mc <<= fullSimplify & massesSubs & wFactor
+            Mc <<= (gcc << (massesSubs & wFactor))
             log 'simplifying ...'
-            Mc <<= fullSimplifyE & massesSubs & mFactor
-            Mc <<= spinorsSimplify & massesSubs & mFactor
+            Mc <<= fullSimplifyE & massesSubs & wFactor
+            Mc <<= spinorsSimplify & massesSubs & wFactor
             log "... done"
             return (quarkDiagrams[bottomSpin] = Mc)
         }

@@ -22,6 +22,24 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/externalcall.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/jopenmaple.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
     <orderEntry type="library" name="Maven: org.codehaus.groovy:groovy-all:2.3.8" level="project" />
     <orderEntry type="module" module-name="groovy" />
     <orderEntry type="module" module-name="core" />
@@ -36,6 +54,24 @@
       <library name="Maven: com.wolfram:jlink:1.0">
         <CLASSES>
           <root url="jar:///Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="Maven: com.maplesoft:jopenmaple1:1.0">
+        <CLASSES>
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/jopenmaple.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library name="Maven: com.maplesoft:jopenmaple2:1.0">
+        <CLASSES>
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/externalcall.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
