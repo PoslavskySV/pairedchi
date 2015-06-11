@@ -18,6 +18,16 @@ do
             jlinkPath="$1"
             shift
         ;;
+        -maplePath)
+            shift
+            maplePath="$1"
+            shift
+        ;;
+        -mapleLibraryPath)
+            shift
+            mapleLibraryPath="$1"
+            shift
+        ;;
         *)
             break
         ;;
@@ -33,6 +43,28 @@ then
     fi
 fi
 
+
+# Maple and Mathematica variables
+if [ -z "$jlinkPath" ];
+then
+    jlinkPath="/Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar"
+fi
+
+if [ -z "$maplePath" ];
+then
+    maplePath="/Library/Frameworks/Maple.framework/Versions/18"
+fi
+
+if [ -z "$mapleLibraryPath" ];
+then
+    mapleLibraryPath="/Library/Frameworks/Maple.framework/Versions/18/bin.APPLE_UNIVERSAL_OSX"
+fi
+
+classpath="${jlinkPath}:${maplePath}/java/jopenmaple.jar:${maplePath}/java/externalcall.jar:target/bbcc.jar"
+export DYLD_LIBRARY_PATH="$mapleLibraryPath"
+export MAPLE="$maplePath"
+
+
 if [ ! -z "$rebuild" ]; 
 then
     dSkipTests=""
@@ -46,22 +78,16 @@ then
     then
         dJLink="\"-Djlink=${jlinkPath}\""
     fi
-    echo mvn clean install assembly:single ${dSkipTests} ${dJLink}
+    echo mvn clean install assembly:single ${dSkipTests} -Djlink=${jlinkPath} -Djopenmaple1=${maplePath}/java/jopenmaple.jar -Djopenmaple2=${maplePath}/java/externalcall.jar
     printf "\n"
-    mvn clean install assembly:single ${dSkipTests} ${dJLink}
-fi
-
-if [ ! -z "$jlinkPath" ];
-then
-    classpath="${jlinkPath}:target/bbcc.jar"
-else
-    classpath="/Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar:target/bbcc.jar"
+    mvn clean install assembly:single ${dSkipTests} -Djlink=${jlinkPath} -Djopenmaple1=${maplePath}/java/jopenmaple.jar -Djopenmaple2=${maplePath}/java/externalcall.jar
 fi
 
 
 # printf "\n\n\n\n\n"
 # echo java -Xmx6g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
 # printf "\n"
-java -Xmx6g -Xms5g -XX:+AggressiveOpts -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
+
+java -Xmx6g -Xms5g -XX:+AggressiveOpts -Djava.library.path="$mapleLibraryPath" -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main "$@"
 
 

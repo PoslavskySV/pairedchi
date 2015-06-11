@@ -32,6 +32,8 @@
 
     <properties>
         <jlink>/Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar</jlink>
+        <jopenmaple1>/Library/Frameworks/Maple.framework/Versions/18/java/jopenmaple.jar</jopenmaple1>
+        <jopenmaple2>/Library/Frameworks/Maple.framework/Versions/18/java/externalcall.jar</jopenmaple2>
     </properties>
 
     <build>
@@ -122,6 +124,20 @@
             <version>1.0</version>
             <scope>system</scope>
             <systemPath>${jlink}</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.maplesoft</groupId>
+            <artifactId>jopenmaple1</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${jopenmaple1}</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>com.maplesoft</groupId>
+            <artifactId>jopenmaple2</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${jopenmaple2}</systemPath>
         </dependency>
 
     </dependencies>

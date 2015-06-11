@@ -23,19 +23,16 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
-import cc.redberry.core.context.OutputFormat
-import cc.redberry.core.tensor.FastTensors
-import cc.redberry.core.tensor.Product
-import cc.redberry.core.tensor.Sum
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 
-import static cc.redberry.core.indices.IndexType.Matrix1
-import static cc.redberry.core.indices.IndexType.Matrix2
+import static cc.redberry.core.indices.IndexType.*
 import static cc.redberry.groovy.RedberryPhysics.DiracTrace
 import static cc.redberry.groovy.RedberryPhysics.mandelstam
 import static cc.redberry.groovy.RedberryStatic.*
@@ -60,7 +57,6 @@ class SetupTest {
                 t <<= defs.FeynmanRules & defs.dTrace & defs.uTrace
                 assert t == '-2*g**2*g_{ab}*g_{BA}'.t
             }
-
         }
     }
 
@@ -76,19 +72,30 @@ class SetupTest {
     @Test
     public void testMathematica() throws Exception {
         use(Redberry) {
-            def stp = new Setup(false, false, false)
+            def stp = new Setup(false, false)
             def t = '(Sin[x]*Sin[y] - Cos[x]*Cos[y])*g_mn + Cos[x+y]*g_mn'.t
             assert stp.mSimplify >> t == 0.t
 
             t = 'a*c + I*b*c - I*a*d + b*d'.t
-            println stp.mFactor >> t
+            println stp.wFactor >> t
         }
     }
 
     @Test
+    public void testMaple() throws Exception {
+
+        use(Redberry) {
+            def stp = new Setup(false, false)
+            def t = 'x**2 - x'.t
+            assert stp.mapleFactorTr >> t == 'x*(x - 1)'.t
+        }
+    }
+
+
+    @Test
     public void testEffectiveVertex1() throws Exception {
         use(Redberry) {
-            def stp = new Setup(true)
+            def stp = new Setup(true, true)
             def vertices = stp.effectiveQuarkoniaVertices()
             for (fl in ['charm', 'bottom'])
                 for (spin in ['scalar', 'axial', 'tensor']) {
@@ -255,358 +262,157 @@ class SetupTest {
         }
     }
 
+    @Ignore
     @Test
-    public void testPolarizations1() throws Exception {
-        //gluon polarizations
+    public void testMultiplicationTable() throws Exception {
         use(Redberry) {
-            def stp = new Setup(true);
-            for (def g in [1, 2]) {
-                def sum = "eps${g}_a[1] * eps${g}_b[-1] + eps${g}_b[1] * eps${g}_a[-1]".t
-                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t
-                assert '2*s**(-1)*k2_{a}*k1_{b}+2*s**(-1)*k2_{b}*k1_{a}-g_{ab}'.t == (stp.mFactor >> sum)
+            def stp = new SetupCC()
+            def momentums = ['p_i[bottom]', 'p1_i[charm]', 'p2_i[charm]', 'k1_i', 'k2_i'].t
+
+            def allExprs = []
+            //single gamma
+            momentums.each {
+                def a = it
+                allExprs << "g_AB*cu[p1_m[charm]]*G^i*$a*v[p2_m[charm]]".t
+                allExprs << "cu[p1_m[charm]]*T_A*T_B*G^i*$a*v[p2_m[charm]]".t
+                allExprs << "cu[p1_m[charm]]*T_B*T_A*G^i*$a*v[p2_m[charm]]".t
             }
-        }
-    }
 
-
-    @Test
-    public void testPolarizations1cc() throws Exception {
-        //gluon polarizations
-        use(Redberry) {
-            def stp = new Setup(false, true);
-            for (def g in [1, 2]) {
-                def sum = "eps${g}_a[1] * eps${g}_b[-1] + eps${g}_b[1] * eps${g}_a[-1]".t
-                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & stp.mFactor
-                assert '2*s**(-1)*k2_{a}*k1_{b}+2*s**(-1)*k2_{b}*k1_{a}-g_{ab}'.t == (stp.mFactor >> sum)
-            }
-        }
-    }
-
-    @Test
-    public void testPolarizations2() throws Exception {
-        //axial mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true);
-            for (def fl in ['charm', 'bottom']) {
-                def sum = "eps_a[$fl, 1] * eps_b[$fl, -1] + eps_a[$fl, 0] * eps_b[$fl, 0] + eps_b[$fl, 1] * eps_a[$fl, -1]".t
-                sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.mFactor
-
-                def expected = "eps_a[h[$fl]] * eps_b[h[$fl]]".t
-                expected <<= stp.epsSum & stp.massesSubs
-                assert (sum - expected) == 0.t
-            }
-        }
-    }
-
-    @Test
-    public void testPolarizations2cc() throws Exception {
-        //axial mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(false, true);
-            def fl = 'bottom'
-            def sum = "eps_a[$fl, 1] * eps_b[$fl, -1] + eps_a[$fl, 0] * eps_b[$fl, 0] + eps_b[$fl, 1] * eps_a[$fl, -1]".t
-            sum <<= stp.polarisations & stp.fullSimplify & stp.massesSubs & stp.mFactor
-
-            def expected = "eps_a[h[$fl]] * eps_b[h[$fl]]".t
-            expected <<= stp.epsSum & stp.massesSubs
-            assert (sum - expected) == 0.t
-        }
-    }
-
-
-    @Test
-    public void testPolarizations3() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            for (def fl in ['bottom']) {
-                def sum = new SumBuilder()
-                def pairs = [["eps_ab[$fl, 2]", "eps_cd[$fl, -2]"].t,
-                             ["eps_ab[$fl, 1]", "eps_cd[$fl, -1]"].t,
-                             ["eps_ab[$fl, 0]", "eps_cd[$fl, 0]"].t,
-                             ["eps_ab[$fl, -1]", "eps_cd[$fl, 1]"].t,
-                             ["eps_ab[$fl, -2]", "eps_cd[$fl, 2]"].t]
-
-                for (def pair in pairs) {
-                    def a = pair[0], b = pair[1]
-                    a <<= stp.polarisations; b <<= stp.polarisations;
-                    for (int i = 0; i < a.size(); ++i)
-                        for (int j = 0; j < b.size(); ++j) {
-                            Product p = a[i] * b[j]
-                            def ind = p.dataSubProduct
-                            ind <<= stp.fullSimplify & stp.massesSubs
-
-                            if (ind.class == Sum)
-                                sum << FastTensors.multiplySumElementsOnFactor(ind, p.indexlessSubProduct)
-                            else
-                                sum << ind * p.indexlessSubProduct
-                        }
+            for (int i = 0; i < momentums.size(); ++i)
+                for (int j = 0; j < momentums.size(); ++j) {
+                    if (i == j)
+                        continue
+                    def a = momentums[i]
+                    def b = '{_i -> _j}'.mapping >> momentums[j]
+                    allExprs << "g_AB*cu[p1_m[charm]]*G^i*G^j*$a*$b*v[p2_m[charm]]".t
+                    allExprs << "cu[p1_m[charm]]*T_A*T_B*G^i*G^j*$a*$b*v[p2_m[charm]]".t
+                    allExprs << "cu[p1_m[charm]]*T_B*T_A*G^i*G^j*$a*$b*v[p2_m[charm]]".t
                 }
 
-                //eps_ab * eps_cd
-                sum = sum.build()
-                println sum.size()
+            def tr = Identity
 
-                sum <<= 'u = 4*mc**2 + 4*mb**2 - s - t'.t & stp.mFactor & stp.mFactor
-                sum.each {
-                    println it
+            println allExprs.size()
+            def conjugate = Conjugate & InvertIndices
+            conjugate &= Reverse[Matrix1, Matrix2]
+            conjugate &= stp.conjugateSpinors
+
+            //75
+            //122876
+            //DescriptiveStatistics:
+            //n: 5625
+            //min: 5.0
+            //max: 144.0
+            //mean: 21.844622222222245
+            //std dev: 10.491243044688652
+            //median: 21.0
+            //skewness: 1.0270421570982076
+            //kurtosis: 3.764432016727073
+            //
+            //
+            //Process finished with exit code 0
+            //661718
+            //DescriptiveStatistics:
+            //n: 5625
+            //min: 74.0
+            //max: 358.0
+            //mean: 117.63875555555543
+            //std dev: 33.90257764322778
+            //median: 109.0
+            //skewness: 2.2500673888050655
+            //kurtosis: 7.4512299782792315
+
+            DescriptiveStatistics raw = new DescriptiveStatistics()
+            def totalRaw = 0
+            for (int i = 0; i < allExprs.size(); ++i)
+                for (int j = 0; j < allExprs.size(); ++j) {
+                    def a = allExprs[i], b = allExprs[j]
+                    b <<= conjugate
+                    def tensor = a * b
+                    def tm = timing({
+                        tensor <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
+                                stp.fullSimplify & stp.massesSubs & stp.uSimplify & stp.massesSubs & stp.wolframFactorTr
+                    }, false)
+                    raw.addValue(1.0 * tm)
+                    totalRaw += tm
+
+                    tr &= (a * b).eq tensor
                 }
-            }
+            println totalRaw
+            println raw
+
+            DescriptiveStatistics subs = new DescriptiveStatistics()
+            def totalSubs = 0
+            for (int i = 0; i < allExprs.size(); ++i)
+                for (int j = 0; j < allExprs.size(); ++j) {
+                    def a = allExprs[i], b = allExprs[j]
+                    b <<= conjugate
+                    def tensor = a * b
+                    def tm = timing({
+                        tensor <<= tr
+                    }, false)
+                    subs.addValue(1.0 * tm)
+                    totalSubs += tm
+
+                    if (!TensorUtils.isSymbolic(tensor))
+                        println 'pizda'
+                }
+
+            println totalSubs
+            println subs
         }
+
     }
 
+    @Ignore
     @Test
-    public void testPolarizations3сс() throws Exception {
-        //tensor mesons polarizations
+    public void testMultiplicationTable1() throws Exception {
         use(Redberry) {
-            def stp = new Setup(false, true);
-            for (def fl in ['bottom']) {
-                def sum = new SumBuilder()
-                def pairs = [["eps_ab[$fl, 2]", "eps_cd[$fl, -2]"].t,
-                             ["eps_ab[$fl, 1]", "eps_cd[$fl, -1]"].t,
-                             ["eps_ab[$fl, 0]", "eps_cd[$fl, 0]"].t,
-                             ["eps_ab[$fl, -1]", "eps_cd[$fl, 1]"].t,
-                             ["eps_ab[$fl, -2]", "eps_cd[$fl, 2]"].t]
+            def stp = new SetupCC()
 
-                for (def pair in pairs) {
-                    def a = pair[0], b = pair[1]
-                    a <<= stp.polarisations; b <<= stp.polarisations;
-                    for (int i = 0; i < a.size(); ++i)
-                        for (int j = 0; j < b.size(); ++j) {
-                            Product p = a[i] * b[j]
-                            def ind = p.dataSubProduct
-                            ind <<= stp.fullSimplify & stp.massesSubs
+            def subs = []
+            //single gamma
+            subs << "cu[p1_m[charm]]*T_A*T_B*v[p2_m[charm]]".t
+            subs << "g_AB*cu[p1_m[charm]]*v[p2_m[charm]]".t
+            subs << "g_AB*cu[p1_m[charm]]*G^i*v[p2_m[charm]]".t
+            subs << "g_AB*cu[p1_m[charm]]*G^i*G5*v[p2_m[charm]]".t
+            subs << "cu[p1_m[charm]]*T_A*T_B*G^i*v[p2_m[charm]]".t
+            subs << "cu[p1_m[charm]]*T_A*T_B*G^i*G5*v[p2_m[charm]]".t
+            subs << "g_AB*cu[p1_m[charm]]*G^i*G^j*v[p2_m[charm]]".t
+            subs << "g_AB*cu[p1_m[charm]]*G^i*G^j*G5*v[p2_m[charm]]".t
+            subs << "cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]".t
+            subs << "cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]".t
 
-                            if (ind.class == Sum)
-                                sum << FastTensors.multiplySumElementsOnFactor(ind, p.indexlessSubProduct)
-                            else
-                                sum << ind * p.indexlessSubProduct
-                        }
-                }
+            subs << "f_ABC*cu[p1_m[charm]]*T^C*v[p2_m[charm]]".t
+            subs << "d_ABC*cu[p1_m[charm]]*T^C*v[p2_m[charm]]".t
 
-                //eps_ab * eps_cd
-                sum = sum.build()
-                println sum.size()
 
-                sum <<= stp.mFactor & stp.mFactor
-                sum.each {
-                    println it
-                }
+            for (int i = 0; i < subs.size(); ++i) {
+                def l = "L${i + 1}${subs[i].indices.free}".t
+                subs[i] = subs[i].eq l
             }
-        }
-    }
 
-    @Test
-    public void testPolarizationsTensorSum() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            for (def fl in ['charm', 'bottom']) {
-                def pairs = [["eps_ab[$fl, 2]", "eps^ab[$fl, -2]"].t,
-                             ["eps_ab[$fl, 1]", "eps^ab[$fl, -1]"].t,
-                             ["eps_ab[$fl, 0]", "eps^ab[$fl, 0]"].t,
-                             ["eps_ab[$fl, -1]", "eps^ab[$fl, 1]"].t,
-                             ["eps_ab[$fl, -2]", "eps^ab[$fl, 2]"].t]
+            def conjugate = Conjugate
+            conjugate &= InvertIndices[LatinUpper]
+            conjugate &= Reverse[Matrix1, Matrix2]
+            conjugate &= stp.conjugateSpinors
+            def ren = '{i -> a, j -> b}'.mapping
 
-                for (def pair in pairs) {
-                    def sum = new SumBuilder()
-                    def a = pair[0], b = pair[1]
-                    a <<= stp.polarisations; b <<= stp.polarisations;
-                    for (int i = 0; i < a.size(); ++i)
-                        for (int j = 0; j < b.size(); ++j) {
-                            Product p = a[i] * b[j]
-                            def ind = p.dataSubProduct
-                            ind <<= stp.fullSimplify & stp.massesSubs
-                            sum << p.indexlessSubProduct * ind
-                        }
+            for (int i = 0; i < subs.size(); ++i)
+                for (int j = 0; j < subs.size(); ++j) {
+                    def lhs = subs[i][1] * ((conjugate & ren) >> subs[j][1])
 
-                    def res = sum.build()
-                    res <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
-                    assert res == 1.t
-                }
-            }
-        }
-    }
+                    def rhs1 = subs[i][0] * ((conjugate & ren) >> subs[j][0])
+                    rhs1 <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
+                            stp.fullSimplify & stp.massesSubs & stp.uSimplify & stp.massesSubs & stp.wFactor
 
+                    def rhs2 = (conjugate >> subs[i][0]) * (ren >> subs[j][0])
+                    rhs2 <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
+                            stp.fullSimplify & stp.massesSubs & stp.uSimplify & stp.massesSubs & stp.wFactor
 
-    @Test
-    public void testPolarizationsTensorSum2() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            for (def fl in ['charm', 'bottom']) {
-
-                for (def l1 in [-2, -1, 0, 1, 2])
-                    for (def l2 in [-2, -1, 0, 1, 2]) {
-                        def sum = new SumBuilder()
-                        def a = "eps_ab[$fl, $l1]".t, b = "eps^ab[$fl, $l2]".t
-                        a <<= stp.polarisations; b <<= stp.polarisations;
-                        for (int i = 0; i < a.size(); ++i)
-                            for (int j = 0; j < b.size(); ++j) {
-                                Product p = a[i] * b[j]
-                                def ind = p.dataSubProduct
-                                ind <<= stp.fullSimplify & stp.massesSubs
-                                sum << p.indexlessSubProduct * ind
-                            }
-                        def res = sum.build()
-                        res <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
-                        if (l1 == -l2)
-                            assert res == 1.t
-                        else
-                            assert res == 0.t
-                    }
-            }
-        }
-    }
-
-    @Test
-    public void testPolarizationsTensorSum2cc() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(false, true);
-            def fl = 'bottom'
-
-            for (def l1 in [-1, 0, 1, 2, -2])
-                for (def l2 in [-1, 0, 1, 2, -2]) {
-                    println "$l1 $l2"
-                    def sum = new SumBuilder()
-                    def a = "eps_ab[$fl, $l1]".t, b = "eps^ab[$fl, $l2]".t
-                    a <<= stp.polarisations; b <<= stp.polarisations;
-                    for (int i = 0; i < a.size(); ++i)
-                        for (int j = 0; j < b.size(); ++j) {
-                            Product p = a[i] * b[j]
-                            def ind = p.dataSubProduct
-                            ind <<= stp.fullSimplify & stp.massesSubs
-                            sum << p.indexlessSubProduct * ind
-                        }
-                    def res = sum.build()
-                    res <<= stp.wolframFactorTr
-                    if (l1 == -l2)
-                        assert res == 1.t
-                    else
-                        assert res == 0.t
+                    println(stp.mFactor >> (rhs1 - rhs2))
                 }
         }
     }
 
-    @Test
-    public void testPolarizationsTensorSym() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            for (def fl in ['charm', 'bottom']) {
-
-                for (def l in [-2, -1, 0, 1, 2]) {
-                    def a = "eps_ab[$fl, $l] - eps_ba[$fl, $l]".t
-                    a <<= stp.polarisations & stp.mFactor
-                    assert a == 0.t
-
-                    a = "eps_ab[$fl, $l] * p^a[$fl]".t
-                    a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & stp.mFactor
-                    assert a == 0.t
-
-                    a = "eps_a^a[$fl, $l]".t
-                    a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs
-                    a <<= 'u = 4*mc**2 + 4*mb**2 -s -t'.t & stp.wolframFactorTr
-                    assert a == 0.t
-                }
-            }
-        }
-    }
-
-    @Test
-    public void testPolarizationsTensorSymcc() throws Exception {
-        //tensor mesons polarizations
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            def fl = 'bottom'
-            for (def l in [-2, -1, 0, 1, 2]) {
-                def a = "eps_ab[$fl, $l] - eps_ba[$fl, $l]".t
-                a <<= stp.polarisations & stp.mFactor
-                assert a == 0.t
-
-                a = "eps_ab[$fl, $l] * p^a[$fl]".t
-                a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs & stp.mFactor
-                assert a == 0.t
-
-                a = "eps_a^a[$fl, $l]".t
-                a <<= stp.polarisations & stp.fullSimplifyE & stp.massesSubs
-                a <<= stp.wolframFactorTr
-                assert a == 0.t
-            }
-        }
-    }
-
-    @Test
-    public void testPols() throws Exception {
-        use(Redberry) {
-            def stp = new Setup(true, true);
-            def f = '(-4096*I)*u**(-1)*mb**2*g**4*(-u+4*mb**2)**(-2)*(-u+4*mc**2)**(-2)*mc**2*g_{AB}'.t
-            def t = 'eps2^{g}[h2]*eps1^{a}[h1]*k1^{i}*k2^{e}*p_{g}[charm]*p_{a}[charm]*eps_{ic}[h[bottom]]*eps_{e}^{c}[h[charm]]'.t
-
-            def pols = stp.setPolarizations(1, 1, 2, 2, 'tensor', 'tensor')
-            def simpl = stp.massesSubs & 'k1^{b}*e^{a}_{bfd}*k2^{f}*p_{a}[charm]*p^{d}[bottom] = 0'.t
-            println pols
-            t <<= pols
-            println 'subs'
-            t <<= ExpandTensors[EliminateMetrics & stp.mandelstam & simpl] & stp.mandelstam & simpl
-            println 'expand'
-            t <<= stp.leviSimplify & simpl
-            println 'levi'
-            t <<= ExpandTensors[EliminateMetrics & stp.mandelstam & simpl] & stp.mandelstam & simpl
-            println 'levi'
-
-
-            println TensorUtils.getAllDiffSimpleTensors(t)
-            println TensorUtils.isSymbolic(t)
-            t <<= stp.gluonsPolarizationCoefficients
-            t <<= stp.chiPolarizationCoefficients['charm']
-            println stp.wolframSimplifyTr >> t
-        }
-    }
-
-    @Test
-    public void testPolarizationCoefficients() throws Exception {
-        use(Redberry) {
-            def stp = new Setup(true, true)
-            def r1 = '16*mb**4 - 4*mb**2*s - 4*mb**2*t - 4*mb**2*u + t*u = x0**(-2)'.t
-            def r2 = '-4*mb**2 + 8*mb*mc - 4*mc**2 + s = x1**(-2)'.t
-            def r3 = '-4*mb**2 - 8*mb*mc - 4*mc**2 + s = x2**(-2)'.t
-            def r4 = '-128*mb**4*mc**2 - 128*mb**2*mc**4 + 16*mb**2*mc**2*s + 16*mb**4*t + 48*mb**2*mc**2*t - 4*mb**2*s*t - 4*mb**2*t**2 + 48*mb**2*mc**2*u + 16*mc**4*u - 4*mc**2*s*u - 4*mb**2*t*u - 4*mc**2*t*u + s*t*u - 4*mc**2*u**2 = x3**(-2)'.t
-            def subs = r1 & r2 & r3 & r4 & PowerExpand
-
-            stp.polarizationCoefficients.each {
-                println it
-//                def t = it
-//                if (t instanceof Tensor) {
-//                    t <<= subs
-//                    println('def ' + t[0] + ' = \'' + t + '\'.t')
-//                }
-            }
-
-            stp.polarisations.each {
-                println it
-            }
-        }
-    }
-
-    @Test
-    public void testxxxx() throws Exception {
-        use(Redberry) {
-            def stp = new Setup(true, true, false)
-            def t = 'mb**(-2)*(-1)**(-1/2)*((-1/8*I)*(2*mb*s*t*x3-s+4*mc**2+4*mb**2-8*mc**2*mb*s*x3+32*mc**4*mb*x3-8*mc**2*mb*t*x3-16*mc**2*mb*x3*u+96*mc**2*mb**3*x3-8*mb**3*t*x3)*x1**2*(2*mb*s*t*x3+s-4*mc**2-4*mb**2-8*mc**2*mb*s*x3+32*mc**4*mb*x3-8*mc**2*mb*t*x3-16*mc**2*mb*x3*u+96*mc**2*mb**3*x3-8*mb**3*t*x3)*x2**2+(1/2)*mb*(-s+4*mc**2+4*mb**2)*x3*x1**2*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x2**2)*p_{a}[bottom]*p_{b}[bottom]+((-1/2*I)*(-4*mc**2*x3*u+4*mb+s*x3*u-4*mb**2*s*x3+48*mc**2*mb**2*x3-4*mb**2*x3*u+16*mb**4*x3-8*mb**2*t*x3)*(-4*mc**2*x3*u-4*mb+s*x3*u-4*mb**2*s*x3+48*mc**2*mb**2*x3-4*mb**2*x3*u+16*mb**4*x3-8*mb**2*t*x3)*x1**2*x2**2+4*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*mb*x3*x1**2*x2**2)*(-1)**(-1/2)*p_{a}[charm]*p_{b}[charm]+((-1/2*I)*mb*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x3**2+(1/4)*(-s+4*mc**2+4*mb**2)*x3)*mb**(-1)*(-1)**(-1/2)*p_{b}[bottom]*k1_{a}+((-1/2*I)*mb*(s*t+48*mc**2*mb**2-4*mc**2*s+16*mc**4-4*mc**2*t-8*mc**2*u-4*mb**2*t)*x3**2+(1/4)*(-s+4*mc**2+4*mb**2)*x3)*mb**(-1)*(-1)**(-1/2)*p_{a}[bottom]*k1_{b}+((-1/2*I)*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*x3**2+2*mb*x3)*(-1)**(-1/2)*p_{b}[charm]*k1_{a}+((-1/2*I)*(-4*mb**2*u+s*u+48*mc**2*mb**2+16*mb**4-4*mc**2*u-4*mb**2*s-8*mb**2*t)*x3**2+2*mb*x3)*(-1)**(-1/2)*p_{a}[charm]*k1_{b}+mb**(-1)*(-1)**(-1/2)*((1/4)*x3*x1**2*(-96*mc**2*mb**2*u-16*mb**4*u+8*mc**2*s*u+4*s**2*mb**2+320*mc**4*mb**2+640*mc**2*mb**4+64*mb**6-s**2*u-16*mc**4*u-96*mc**2*mb**2*s-32*mb**4*s+16*mb**2*s*t-64*mc**2*mb**2*t-64*mb**4*t+8*mb**2*s*u)*x2**2+(-1/2*I)*(32*u**2*mc**4*x3**2+32*mb**4*t**2*x3**2-320*mc**2*mb**4*u*x3**2+32*mc**2*mb**2*t**2*x3**2+32*mc**4*s*u*x3**2-640*mc**4*mb**2*u*x3**2+s**2*t*u*x3**2-8*mb**2*s*t**2*x3**2+32*u**2*mc**2*mb**2*x3**2-8*mc**2*s*t*u*x3**2-8*u**2*mc**2*s*x3**2-320*mc**4*mb**2*t*x3**2-256*mc**2*mb**4*s*x3**2-256*mc**4*mb**2*s*x3**2+16*mb**4*t*u*x3**2-640*mc**2*mb**4*t*x3**2-8*mc**2+768*mc**2*mb**6*x3**2+768*mc**6*mb**2*x3**2-64*mb**6*t*x3**2+96*mc**2*mb**2*t*u*x3**2-8*mb**2+96*mc**2*mb**2*s*u*x3**2-64*mc**6*u*x3**2+16*s**2*mc**2*mb**2*x3**2+2*s-4*s**2*mb**2*t*x3**2-4*s**2*mc**2*u*x3**2+96*mc**2*mb**2*s*t*x3**2+2560*mc**4*mb**4*x3**2+32*mb**4*s*t*x3**2+16*mc**4*t*u*x3**2-8*mb**2*s*t*u*x3**2)*mb*x1**2*x2**2)*p_{a}[bottom]*p_{b}[charm]+mb**(-1)*(-1)**(-1/2)*((1/4)*x3*x1**2*(-96*mc**2*mb**2*u-16*mb**4*u+8*mc**2*s*u+4*s**2*mb**2+320*mc**4*mb**2+640*mc**2*mb**4+64*mb**6-s**2*u-16*mc**4*u-96*mc**2*mb**2*s-32*mb**4*s+16*mb**2*s*t-64*mc**2*mb**2*t-64*mb**4*t+8*mb**2*s*u)*x2**2+(-1/2*I)*(32*u**2*mc**4*x3**2+32*mb**4*t**2*x3**2-320*mc**2*mb**4*u*x3**2+32*mc**2*mb**2*t**2*x3**2+32*mc**4*s*u*x3**2-640*mc**4*mb**2*u*x3**2+s**2*t*u*x3**2-8*mb**2*s*t**2*x3**2+32*u**2*mc**2*mb**2*x3**2-8*mc**2*s*t*u*x3**2-8*u**2*mc**2*s*x3**2-320*mc**4*mb**2*t*x3**2-256*mc**2*mb**4*s*x3**2-256*mc**4*mb**2*s*x3**2+16*mb**4*t*u*x3**2-640*mc**2*mb**4*t*x3**2-8*mc**2+768*mc**2*mb**6*x3**2+768*mc**6*mb**2*x3**2-64*mb**6*t*x3**2+96*mc**2*mb**2*t*u*x3**2-8*mb**2+96*mc**2*mb**2*s*u*x3**2-64*mc**6*u*x3**2+16*s**2*mc**2*mb**2*x3**2+2*s-4*s**2*mb**2*t*x3**2-4*s**2*mc**2*u*x3**2+96*mc**2*mb**2*s*t*x3**2+2560*mc**4*mb**4*x3**2+32*mb**4*s*t*x3**2+16*mc**4*t*u*x3**2-8*mb**2*s*t*u*x3**2)*mb*x1**2*x2**2)*p_{a}[charm]*p_{b}[bottom]-(1/2)*x1**(-2)*x3**2*x2**(-2)*k1_{a}*k1_{b}'.t
-            println TensorUtils.info(t)
-            println t
-            println(t << (ExpandAll & stp.mFactor))
-
-            t.each {
-                println ''
-                println it
-                if (it.class == Product) {
-                    println it.indexlessSubProduct//.toString(OutputFormat.WolframMathematica)
-                    println it.dataSubProduct
-                }
-            }
-        }
-    }
 }
+
