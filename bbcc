@@ -61,8 +61,21 @@ then
 fi
 
 classpath="${jlinkPath}:${maplePath}/java/jopenmaple.jar:${maplePath}/java/externalcall.jar:target/bbcc.jar"
-export DYLD_LIBRARY_PATH="$mapleLibraryPath"
+
 export MAPLE="$maplePath"
+os=`uname`
+case $os in
+    Darwin)
+        export DYLD_LIBRARY_PATH="$mapleLibraryPath"
+    ;;
+    Linux)
+        export LD_LIBRARY_PATH="$mapleLibraryPath"
+    ;;
+    *)
+       echo "Unknown OS."
+       exit 1
+    ;;
+esac
 
 
 if [ ! -z "$rebuild" ]; 
