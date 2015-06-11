@@ -30,14 +30,11 @@ import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
-
-import java.util.regex.Matcher
-import java.util.regex.Pattern
 
 import static cc.redberry.core.indices.IndexType.*
 import static cc.redberry.core.utils.TensorUtils.info
-import static cc.redberry.core.utils.TensorUtils.passOutDummies
 import static cc.redberry.groovy.RedberryPhysics.DiracTrace
 import static cc.redberry.groovy.RedberryPhysics.mandelstam
 import static cc.redberry.groovy.RedberryStatic.*
@@ -90,7 +87,9 @@ class SetupTest {
     public void testMaple() throws Exception {
 
         use(Redberry) {
-
+            def stp = new Setup(false, false)
+            def t = 'x**2 - x'.t
+            assert stp.mapleFactorTr >> t == 'x*(x - 1)'.t
         }
     }
 
@@ -265,25 +264,7 @@ class SetupTest {
         }
     }
 
-    @Test
-    public void testProcess() throws Exception {
-        use(Redberry) {
-            def stp = new Setup(true, true)
-
-            def charmSpin = 'axial'
-            def bottomSpin = 'tensor'
-            //first diagram
-            def Ma = "eps1^a[h1] * A${charmSpin}_{aA cC}[charm, k1_i, -k1_i + p_i[charm]] * G^cd[k1_i - p_i[charm]] * g^CD * eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
-            //second diagram
-            def Mb = "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]] * G^cd[k1_i - p_i[bottom]] * g^CD * eps2^b[h2] * A${charmSpin}_{dD bB}[charm, -k2_i + p_i[charm], k2_i]".t
-
-            def pols = stp.setupPolarisations(1, 1)
-            def M2 = stp.calcProcess([Ma, Mb], pols)
-            M2 <<= stp.wolframFactorTr
-            println M2
-        }
-    }
-
+    @Ignore
     @Test
     public void testMultiplicationTable() throws Exception {
         use(Redberry) {
@@ -384,6 +365,7 @@ class SetupTest {
 
     }
 
+    @Ignore
     @Test
     public void testMultiplicationTable1() throws Exception {
         use(Redberry) {
@@ -428,6 +410,27 @@ class SetupTest {
         }
     }
 
+    
+    @Test
+    public void testProcess_chi() throws Exception {
+        use(Redberry) {
+            println CC.nameManager.seed
+
+            def stp = new SetupChi()
+            def charmSpin = 'scalar', bottomSpin = 'scalar'
+
+            def M2 = '0'.t
+            for (def g1 in [1, -1])
+                for (def g2 in [1, -1]) {
+                    def pols = stp.setupPolarisations(g1, g2)
+                    M2 += stp.calcProcess(stp.diagrams(charmSpin, bottomSpin), pols)
+                }
+            M2 <<= stp.wolframFactorTr
+            println M2
+            println M2.toString(OutputFormat.WolframMathematica)
+        }
+    }
+
     @Test
     public void testProcess_cc() throws Exception {
         use(Redberry) {
@@ -435,15 +438,6 @@ class SetupTest {
             println CC.nameManager.seed
 
             def stp = new SetupCC()
-            stp.mapleEngine.evaluate("unprotect(`evala/Factors/efactor`);\n" +
-                    "`evala/Factors/efactor` := proc(f1,vars,rofs,alginds) \n" +
-                    "  if nops(alginds) > 0 then\n" +
-                    "    `evala/Factors/multiff`(f1,vars,alginds,rofs,{})\n" +
-                    "  else\n" +
-                    "    `evala/Factors/multinf`(f1,vars,rofs,{})\n" +
-                    "  end if:\n" +
-                    "end proc:")
-
             stp.setupSpinorStructures()
 
             def bottomSpin = 'scalar'
@@ -453,13 +447,13 @@ class SetupTest {
 
             StringBuilder sb = new StringBuilder()
             sb.append("r := ").append(M2.toString(OutputFormat.Maple)).append(":")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.maple') << sb.toString()
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.maple') << sb.toString()
 
             sb = new StringBuilder()
             sb.append("r = ").append(M2.toString(OutputFormat.WolframMathematica)).append(";")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.m') << sb.toString()
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.m') << sb.toString()
 
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.redberry') << M2.toString(OutputFormat.Redberry)
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.redberry') << M2.toString(OutputFormat.Redberry)
 
             println info(M2)
             M2 <<= 's = 5*x**2'.t & 't1 = 23*x**2'.t & 't2 = 13*x**2'.t & 'u1 = 12*x**2'.t & 'u2 = 523*x**2'.t & 'mb = 32*x'.t & 'mc = 11*x'.t
@@ -468,96 +462,44 @@ class SetupTest {
         }
     }
 
+
     @Test
-    public void testxxx() throws Exception {
+    public void testProcess_cc_all() throws Exception {
         use(Redberry) {
-            def fileMaple = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/exprs.redberry')
+            //-8955305736816440593
+            println CC.nameManager.seed
+
             def stp = new SetupCC()
-            String r = ''
-            fileMaple.eachLine { r += it }
-            println r.t[1]
+            stp.setupSpinorStructures()
+
+            def bottomSpin = 'scalar'
+
+            def M2 = 0.t
+            for (def g1 in [1, -1])
+                for (def g2 in [1, -1]) {
+                    stp.log '###########'
+                    stp.log "pols : $g1 $g2"
+                    stp.log '###########'
+
+                    def pols = stp.setupPolarisations(g1, g2)
+                    M2 += stp.calcProcess(stp.diagrams(bottomSpin), pols)
+                }
 
 
-        }
-    }
+            StringBuilder sb = new StringBuilder()
+            sb.append("r := ").append(M2.toString(OutputFormat.Maple)).append(":")
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.maple') << sb.toString()
 
-    @Test
-    public void testxx2x1() throws Exception {
-        use(Redberry) {
-//            String[] args = ["-linkmode", "launch", "-linkname", "\"/Applications/Mathematica.app/Contents/MacOS/MathKernel\" -mathlink"];
-//
-//            def mathematicaKernel = MathLinkFactory.createKernelLink(args)
-//            mathematicaKernel.discardAnswer();
-//
-//            println mathematicaKernel.evaluateToInputForm('Factor[m[x]^2 - m[x]]',0)
-//            mathematicaKernel.close()
-            def stp = new SetupCC()
-            def f = Factor[[FactorScalars: true, FactorizationEngine: { x -> stp.wolframFactorTr >> x } as Transformation]]
-            println 'm[x]**2- m[x]'.t.toString(OutputFormat.WolframMathematica)
-            println stp.wolframFactorTr >> 'm[x]**2- m[x]'.t
-        }
-    }
+            sb = new StringBuilder()
+            sb.append("r = ").append(M2.toString(OutputFormat.WolframMathematica)).append(";")
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.m') << sb.toString()
 
-    @Test
-    public void testxxx1() throws Exception {
-        use(Redberry) {
-            def stp = new SetupCC()
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.redberry') << M2.toString(OutputFormat.Redberry)
 
-            def f = Factor[[FactorScalars: true, FactorizationEngine: stp.wolframFactorTr]]
-            def v = stp.effectiveQuarkoniaVertices()['scalar'][1]
-            def ov = v
-            v <<= 'p_i[fl] = k1_i + k2_i'.t //& 'm[fl] = m'.t
-            v <<= ExpandAll[EliminateMetrics] & EliminateMetrics & Together
-            println f >> v
-
-            ov <<= 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p_i[fl] = 33* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
-            v <<= 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p_i[fl] = 33* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
-            println ov
-            println v
-        }
-    }
-
-    @Test
-    public void testxxx2() throws Exception {
-        use(Redberry) {
-            def stp = new SetupCC()
-
-            def f = Factor[[FactorScalars: true, FactorizationEngine: stp.wolframFactorTr]]
-            def v = stp.effectivePairVertex()[1]
-            def ov = v
-            v <<= 'p1_i[fl] = k1_i + k2_i - p2_i[fl]'.t //& 'm[fl] = m'.t
-            v <<= ExpandAll[EliminateMetrics] & EliminateMetrics & Together
-            println ov
-            println f >> v
-
-            ov <<= 'G_i = 12* t_i'.t & 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p1_i[fl] = 30* t_i'.t & 'p2_i[fl] = 3* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
-            v <<= 'G_i = 12* t_i'.t & 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p1_i[fl] = 30* t_i'.t & 'p2_i[fl] = 3* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
-            println ov
-            println v
-        }
-    }
-
-    private static final Pattern mapleFuncPattern = Pattern.compile('([a-zA-Z0-9]\\([^\\(\\)]+\\))')
-
-    @Test
-    public void testdasfjnsdf() throws Exception {
-        def str = '2*(m(a) - s '
-        Matcher matcher = mapleFuncPattern.matcher(str)
-        StringBuffer sb = new StringBuffer()
-        while (matcher.find()) {
-            matcher.appendReplacement(sb, matcher.group(1).replace('(', '[').replace(')', ']'))
-            //matcher.replaceAll(matcher.group().replace('(', '['))
-        }
-        println sb.toString()
-
-    }
-
-    @Test
-    public void test123() throws Exception {
-        use(Redberry) {
-            Tuples([3, 4]).each { i, j ->
-                println "$i, $j"
-            }
+            println info(M2)
+            M2 <<= 's = 5*x**2'.t & 't1 = 23*x**2'.t & 't2 = 13*x**2'.t & 'u1 = 12*x**2'.t & 'u2 = 523*x**2'.t & 'mb = 32*x'.t & 'mc = 11*x'.t
+            M2 <<= stp.mapleFactorTr
+            println M2
         }
     }
 }

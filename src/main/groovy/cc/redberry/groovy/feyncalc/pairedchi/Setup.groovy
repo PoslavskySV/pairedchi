@@ -22,6 +22,7 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
+import cc.redberry.core.number.Complex
 import cc.redberry.core.tensor.*
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.IteratorWithProgress
@@ -594,6 +595,8 @@ class Setup implements AutoCloseable {
 
     Tensor squareMatrixElement(Tensor matrixElement, String spins) {
         use(Redberry) {
+            if (matrixElement.class == Complex)
+                return matrixElement**2
             spins = spins == null ? '' : "($spins)"
             log "Squaring matrix element $spins: ${info(matrixElement)}"
 
@@ -627,7 +630,7 @@ class Setup implements AutoCloseable {
                 def overallNum = (num_p.class == Product ? num_p.indexlessSubProduct : '1'.t) * (cNum_p.class == Product ? cNum_p.indexlessSubProduct : 1.t) * numSb.build()
                 log 'done term:'
                 assert isSymbolic(overallNum)
-                overallNum <<= wolframFactorTr
+                //overallNum <<= mapleFactorTr
                 log(info(overallNum))
 
                 def den = (Denominator >> part) * (Denominator >> cPart)

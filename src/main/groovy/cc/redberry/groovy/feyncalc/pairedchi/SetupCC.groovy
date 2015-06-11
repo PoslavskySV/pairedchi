@@ -71,7 +71,6 @@ class SetupCC extends Setup {
         use(Redberry) {
             def diagrams = []
             //gluon diagrams
-            //cu[p1_m[fl]]*(V_aA*D[p1_m[fl] - k1_m, m[fl]]*V_bB + V_bB*D[p1_m[fl] - k2_m, m[fl]]*V_aA)*v[p2_m[fl]]
             def glMa = """eps1^a[h1] * B_{aA cC}[charm, k1_i, k2_i - p_i[bottom]]
                         * G^cd[-k2_i + p_i[bottom]] * g^CD
                         * eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]""".t
@@ -80,7 +79,7 @@ class SetupCC extends Setup {
                         * eps1^a[h1] * A${bottomSpin}_{dD aA}[bottom, -k1_i + p_i[bottom], k1_i]""".t
             diagrams += [glMa, glMb]
 
-            //3-gluion diagrams
+            //3-gluon diagrams
             def gl3Ma = """eps1^a[h1] * Vcc^cC * V_{cC aA dD}[-p1_a[charm] - p2_a[charm], k1_a, k2_a - p_a[bottom]]
                         * G^de[-k2_a + p_a[bottom]]*g^DE
                         * A${bottomSpin}_{eE bB}[bottom, -k2_a + p_a[bottom], k2_a] * eps2^b[h2]""".t

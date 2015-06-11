@@ -25,7 +25,17 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/externalcall.jar!/" />
+          <root url="file:///Library/Frameworks/Maple.framework/Versions/18/java" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+        <jarDirectory url="file:///Library/Frameworks/Maple.framework/Versions/18/java" recursive="false" />
+      </library>
+    </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/18/java/jopenmaple.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -34,7 +44,7 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/jopenmaple.jar!/" />
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/18/java/externalcall.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -62,7 +72,7 @@
     <orderEntry type="module-library">
       <library name="Maven: com.maplesoft:jopenmaple1:1.0">
         <CLASSES>
-          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/jopenmaple.jar!/" />
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/18/java/jopenmaple.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />
@@ -71,7 +81,7 @@
     <orderEntry type="module-library">
       <library name="Maven: com.maplesoft:jopenmaple2:1.0">
         <CLASSES>
-          <root url="jar:///Library/Frameworks/Maple.framework/Versions/16/java/externalcall.jar!/" />
+          <root url="jar:///Library/Frameworks/Maple.framework/Versions/18/java/externalcall.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />

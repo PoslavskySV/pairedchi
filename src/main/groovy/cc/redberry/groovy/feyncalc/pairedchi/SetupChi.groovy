@@ -47,6 +47,14 @@ class SetupChi extends Setup {
         }
     }
 
+    def diagrams(charmSpin, bottomSpin) {
+        use(Redberry) {
+            def Ma = "eps1^a[h1] * A${charmSpin}_{aA cC}[charm, k1_i, -k1_i + p_i[charm]] * G^cd[k1_i - p_i[charm]] * g^CD * eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]".t
+            def Mb = "eps1^a[h1] * A${bottomSpin}_{aA cC}[bottom, k1_i, -k1_i + p_i[bottom]] * G^cd[k1_i - p_i[bottom]] * g^CD * eps2^b[h2] * A${charmSpin}_{dD bB}[charm, -k2_i + p_i[charm], k2_i]".t
+            return [Ma, Mb]
+        }
+    }
+
     Tensor setupFeynmanDiagrams(charmSpin, bottomSpin, apply = Identity) {
         if (diagrams[charmSpin + bottomSpin] != null)
             return diagrams[charmSpin + bottomSpin]
