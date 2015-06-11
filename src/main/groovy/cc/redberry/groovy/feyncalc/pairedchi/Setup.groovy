@@ -24,6 +24,7 @@ package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.tensor.*
 import cc.redberry.core.transformations.Transformation
+import cc.redberry.core.utils.IteratorWithProgress
 import cc.redberry.groovy.Redberry
 import com.maplesoft.openmaple.Engine
 import com.maplesoft.openmaple.EngineCallBacksDefault
@@ -511,6 +512,9 @@ class Setup implements AutoCloseable {
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
 
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
+
             spinorStructuresVars = []
             for (int i = 0; i < subs.size(); ++i) {
                 def l = "L${i + 1}${subs[i].indices.free}".t
@@ -565,25 +569,9 @@ class Setup implements AutoCloseable {
             //replacing spinor structures
             num <<= spinorStructures
             num <<= Collect[*spinorStructuresVars, wFactor, [ExpandSymbolic: false]]
-            log 'Amplitude info:'
-            log(info(num))
-            num.each {
-                println it.dataSubProduct
-            }
-//            num.each {
-//                def t = it.dataSubProduct.toString()
-//                if (t.length() < 2000)
-//                    println t
-//            }
-            //if (num instanceof Sum)
-            //    amp = FastTensors.multiplySumElementsOnFactor(num, 1 / den)
-            //else amp = num / den
-
-            amp = num / den
-            println den.toString(WolframMathematica)
-            log 'Amplitude info:'
-            log(info(amp))
-            return amp
+            log "Amplitude (numerator) info: ${info(num)}"
+            //num.each { println it.dataSubProduct }
+            return num / den
         }
     }
 
@@ -605,64 +593,44 @@ class Setup implements AutoCloseable {
     }
 
     Tensor squareMatrixElement(Tensor matrixElement, String spins) {
-
         use(Redberry) {
-            spins = spins == null ? '' : spins
-            log 'Squaring matrix element:'
-            log(info(matrixElement))
+            spins = spins == null ? '' : "($spins)"
+            log "Squaring matrix element $spins: ${info(matrixElement)}"
 
-            def elements
-            if (matrixElement.class != Sum)
-                elements = [matrixElement]
-            else
-                elements = matrixElement as List
-
+            def wrap = { expr -> expr.class == Sum ? expr as List : [expr] }
+            def mElements = wrap(matrixElement)
             def conjugate = Conjugate & InvertIndices
-//            def conjugate = Conjugate & InvertIndices
-//            conjugate &= Reverse[Matrix1, Matrix2]
-//            conjugate &= conjugateSpinors
+            //def conjugate = Conjugate & InvertIndices
+            //conjugate &= Reverse[Matrix1, Matrix2]
+            //conjugate &= conjugateSpinors
 
             //def cMatrixElement = conjugate >> matrixElement
             //return ParallelExpand.parallelExpand(matrixElement, cMatrixElement, this.&calcProduct as Transformation, { l -> this.log(l) })
-            def totalTermsNumber = elements.size() * elements.size()
-            def counter = 0
 
             def result = new SumBuilder()
-            def percent = -1
+            PTuples([mElements.size(), mElements.size()], 'squaring').each { i, j ->
+                def part = mElements[i],
+                    cPart = conjugate >> mElements[j]
+                assert part.class == Product && cPart.class == Product
 
-            for (int i = 0; i < elements.size(); ++i) {
-                for (int j = 0; j < elements.size(); ++j) {
-                    def part = elements[i],
-                        cPart = elements[j]
+                def num_p = Numerator >> part,
+                    cNum_p = Numerator >> cPart
+                def num = wrap(num_p.class == Product ? num_p.dataSubProduct : num_p),
+                    cNum = wrap(cNum_p.class == Product ? cNum_p.dataSubProduct : cNum_p)
 
-                    def num_p = Numerator >> part,
-                        cNum_p = Numerator >> cPart
+                def numSb = new SumBuilder()
+                PTuples([num.size(), cNum.size()], '  squaring term').each { i1, j1 ->
+                    numSb << calcProduct(num[i1] * cNum[j1])
+                }
 
-                    def num = num_p.dataSubProduct,
-                        cNum = cNum_p.dataSubProduct
 
-                    assert num.class == Sum
-                    assert cNum.class == Sum
+                def overallNum = (num_p.class == Product ? num_p.indexlessSubProduct : '1'.t) * (cNum_p.class == Product ? cNum_p.indexlessSubProduct : 1.t) * numSb.build()
+                log 'done term:'
+                assert isSymbolic(overallNum)
+                overallNum <<= wolframFactorTr
+                log(info(overallNum))
 
-                    def numSb = new SumBuilder()
-                    def counter1 = 0, totalTermsNumber1 = part.size() * cPart.size(), percent1 = -1
-                    for (int i1 = 0; i1 < num.size(); ++i1) {
-                        for (int j1 = 0; j1 < cNum.size(); ++j1) {
-
-                            numSb << calcProduct(num[i1] * (conjugate >> cNum[j1]))
-                            def p1 = (int) (100.0 * counter1 / totalTermsNumber1)
-                            if (p1 != percent1) {
-                                percent1 = p1;
-                                if (percent1 <= 10 || percent1 % 10 == 0)
-                                    log("    term progress " + percent1 + "%")
-                            }
-                            ++counter1
-                        }
-                    }
-
-                    def overallNum = num_p.indexlessSubProduct * cNum_p.indexlessSubProduct * numSb.build()
-                    def den = (Denominator >> part) * (Denominator >> cPart)
-                    overallNum <<= mapleFactorTr
+                def den = (Denominator >> part) * (Denominator >> cPart)
 
 //                    println 'num info'
 //                    println info(num)
@@ -674,19 +642,22 @@ class Setup implements AutoCloseable {
 
 //                    println info(num)
 
-                    result << (overallNum / den)
-
-                    //print percentage
-                    def p = (int) (100.0 * counter / totalTermsNumber)
-                    if (p != percent) {
-                        percent = p;
-                        if (percent <= 10 || percent % 10 == 0)
-                            log("$spins progress " + percent + "%")
-                    }
-                    ++counter
-                }
+                result << (overallNum / den)
             }
+
             return result.build()
+        }
+    }
+
+    Iterable<List<Integer>> PTuples(List bounds, pref = '') {
+        def tuples = Tuples(bounds)
+        return new Iterable<List<Integer>>() {
+            @Override
+            Iterator<List<Integer>> iterator() {
+                return new IteratorWithProgress<List<Integer>>(tuples.iterator(),
+                        bounds.inject(1, { a, b -> a * b }),
+                        { p -> log "$pref $p %" })
+            }
         }
     }
 

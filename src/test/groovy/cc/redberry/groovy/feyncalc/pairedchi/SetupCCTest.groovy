@@ -24,14 +24,13 @@ package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
-import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 import org.junit.Ignore
 import org.junit.Test
 
-import static cc.redberry.groovy.RedberryStatic.EliminateMetrics
-import static cc.redberry.groovy.RedberryStatic.Identity
+import static cc.redberry.core.utils.TensorUtils.info
+import static cc.redberry.groovy.RedberryStatic.*
 
 /**
  * Created by poslavsky on 03/04/15.
@@ -235,5 +234,31 @@ class SetupCCTest {
                 println str
             }
         }
+    }
+
+    @Test
+    public void testQd() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def factor = Factor[[FactorScalars: true, FactorizationEngine: stp.wolframFactorTr]]
+            def mm = 'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t & 'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+
+            def amp = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
+            amp <<= stp.FeynmanRules & 'pCharm_m = p1_m[charm] + p2_m[charm]'.t & ExpandDenominator & EliminateMetrics & mm & stp.mandelstam
+            amp <<= stp.spinSingletProjector['bottom'] & stp.dTraceSimplify & stp.uTrace & stp.fullSimplify & stp.uSimplify
+                    'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t &
+                    'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+
+            amp <<= stp.momentums['bottom'] & 'q_i[bottom] = q_i'.t.hold & stp.taylor('q_i') & 'q_i = q_i[bottom]'.t
+            amp <<= ExpandTensors[EliminateMetrics] & EliminateMetrics & stp.mandelstam
+            amp <<= stp.totalSpinProjector['scalar'] & stp.mandelstam
+
+            println info(amp)
+            amp <<= Together & factor
+            println info(amp)
+
+            println Denominator >> amp
+        }
+
     }
 }

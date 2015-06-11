@@ -36,6 +36,8 @@ import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 import static cc.redberry.core.indices.IndexType.*
+import static cc.redberry.core.utils.TensorUtils.info
+import static cc.redberry.core.utils.TensorUtils.passOutDummies
 import static cc.redberry.groovy.RedberryPhysics.DiracTrace
 import static cc.redberry.groovy.RedberryPhysics.mandelstam
 import static cc.redberry.groovy.RedberryStatic.*
@@ -400,6 +402,10 @@ class SetupTest {
             subs << "cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]".t
             subs << "cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]".t
 
+            subs << "f_ABC*cu[p1_m[charm]]*T^C*v[p2_m[charm]]".t
+            subs << "d_ABC*cu[p1_m[charm]]*T^C*v[p2_m[charm]]".t
+
+
             for (int i = 0; i < subs.size(); ++i) {
                 def l = "L${i + 1}${subs[i].indices.free}".t
                 subs[i] = subs[i].eq l
@@ -429,20 +435,35 @@ class SetupTest {
             println CC.nameManager.seed
 
             def stp = new SetupCC()
+            stp.mapleEngine.evaluate("unprotect(`evala/Factors/efactor`);\n" +
+                    "`evala/Factors/efactor` := proc(f1,vars,rofs,alginds) \n" +
+                    "  if nops(alginds) > 0 then\n" +
+                    "    `evala/Factors/multiff`(f1,vars,alginds,rofs,{})\n" +
+                    "  else\n" +
+                    "    `evala/Factors/multinf`(f1,vars,rofs,{})\n" +
+                    "  end if:\n" +
+                    "end proc:")
+
             stp.setupSpinorStructures()
+
             def bottomSpin = 'scalar'
 
             def pols = stp.setupPolarisations(1, 1)
             def M2 = stp.calcProcess(stp.diagrams(bottomSpin), pols)
-            println 'FACTOR'
+
             StringBuilder sb = new StringBuilder()
             sb.append("r := ").append(M2.toString(OutputFormat.Maple)).append(":")
-
             new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.maple') << sb.toString()
+
+            sb = new StringBuilder()
+            sb.append("r = ").append(M2.toString(OutputFormat.WolframMathematica)).append(";")
+            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.m') << sb.toString()
+
             new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.redberry') << M2.toString(OutputFormat.Redberry)
 
-            println TensorUtils.info(M2)
-            M2 <<= stp.wolframFactorTr
+            println info(M2)
+            M2 <<= 's = 5*x**2'.t & 't1 = 23*x**2'.t & 't2 = 13*x**2'.t & 'u1 = 12*x**2'.t & 'u2 = 523*x**2'.t & 'mb = 32*x'.t & 'mc = 11*x'.t
+            M2 <<= stp.mapleFactorTr
             println M2
         }
     }
@@ -510,7 +531,7 @@ class SetupTest {
             println f >> v
 
             ov <<= 'G_i = 12* t_i'.t & 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p1_i[fl] = 30* t_i'.t & 'p2_i[fl] = 3* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
-            v <<=  'G_i = 12* t_i'.t & 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p1_i[fl] = 30* t_i'.t & 'p2_i[fl] = 3* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
+            v <<= 'G_i = 12* t_i'.t & 'k1_i = 12* t_i'.t & 'k2_i = 21* t_i'.t & 'p1_i[fl] = 30* t_i'.t & 'p2_i[fl] = 3* t_i'.t & ExpandAndEliminate & 't_i*t^i = x**2'.t & 'm[fl] = x'.t & 'm = x'.t
             println ov
             println v
         }
@@ -529,6 +550,15 @@ class SetupTest {
         }
         println sb.toString()
 
+    }
+
+    @Test
+    public void test123() throws Exception {
+        use(Redberry) {
+            Tuples([3, 4]).each { i, j ->
+                println "$i, $j"
+            }
+        }
     }
 }
 

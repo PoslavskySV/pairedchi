@@ -30,6 +30,7 @@ import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.groovy.Redberry
 
+import static cc.redberry.core.utils.TensorUtils.info
 import static cc.redberry.groovy.RedberryStatic.*
 
 /**
@@ -62,7 +63,7 @@ class SetupCC extends Setup {
             spinorsSimplify &= 'G_a*p2^a[charm]*v[p2_m[charm]] = -m[charm]*v[p2_m[charm]]'.t
 
             gcc = 'Vcc_iI = G_ij[p1_m[charm] + p2_m[charm]]*cu[p1_m[charm]]*V^j_I*v[p2_m[charm]]'.t
-            gcc <<= FeynmanRules & fullSimplify
+            //gcc <<= FeynmanRules & fullSimplify
         }
     }
 
@@ -90,8 +91,9 @@ class SetupCC extends Setup {
             def gl3Mc = """eps1^a[h1] * eps2^b[h2] * V_{aA bB cC}[k1_a, k2_a, -k1_a - k2_a]
                         * G^cd[k1_a + k2_a]*g^CD
                         * A${bottomSpin}_{dD eE}[bottom, k1_a + k2_a, -p1_a[charm] - p2_a[charm]] * Vcc^eE""".t
-//            diagrams += [gl3Ma, gl3Mb, gl3Mc]
+            diagrams += [gl3Ma, gl3Mb, gl3Mc]
 
+            log 'Setting up quark diagrams ...'
             //quark diagrams
             // (1,2,3)
             def qMa = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_bB*eps2^b[h2]*D[k1_m - p2_m[bottom], m[bottom]]*V_aA*eps1^a[h1]*v[p2_m[bottom]]'.t
@@ -107,22 +109,25 @@ class SetupCC extends Setup {
             def qMf = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_aA*eps1^a[h1]*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
 
             for (def qM in [qMa, qMb, qMc, qMd, qMe, qMf]) {
-//                diagrams += calcQAmp('pCharm_m = p1_m[charm] + p2_m[charm]'.t >> qM, bottomSpin)
+                diagrams += calcQAmp(qM, bottomSpin)
             }
-            diagrams = diagrams.collect({ it << ccVertex })
+            diagrams = diagrams.collect({ it << (gcc & EliminateMetrics) })
+            log '... done'
             return diagrams
         }
     }
 
     def calcQAmp(Tensor amp, bottomSpin) {
         use(Redberry) {
-            amp <<= FeynmanRules
-            amp <<= spinSingletProjector['bottom'] & dTraceSimplify &
-                    'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t &
-                    'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+            def factor = Factor[[FactorScalars: true, FactorizationEngine: wolframFactorTr]]
+            def mm = 'p2_{f}[bottom]*p2^{f}[bottom] = m[bottom]**2'.t & 'p1_{d}[bottom]*p1^{d}[bottom] = m[bottom]**2'.t
+            amp <<= FeynmanRules & 'pCharm_m = p1_m[charm] + p2_m[charm]'.t & ExpandDenominator & EliminateMetrics & mm & mandelstam
+            amp <<= spinSingletProjector['bottom'] & dTraceSimplify & mm
             amp <<= momentums['bottom'] & 'q_i[bottom] = q_i'.t.hold & taylor('q_i') & 'q_i = q_i[bottom]'.t
-            amp <<= EliminateMetrics & mandelstam
-            amp <<= totalSpinProjector[bottomSpin]
+            amp <<= ExpandTensors[EliminateMetrics] & EliminateMetrics & mandelstam
+            amp <<= totalSpinProjector[bottomSpin] & mandelstam
+            amp <<= Together & factor
+
             return amp.class == Sum ? amp.toList() : [amp]
         }
     }
