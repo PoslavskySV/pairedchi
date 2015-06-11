@@ -89,7 +89,8 @@ class Setup implements AutoCloseable {
     public Transformation wFactor, wolframFactorTr, mSimplify, wolframSimplifyTr, wolframFactorSqrtTr
 
     //Maple related
-    Engine mapleEngine;
+    //only one instance per programm (maple is slag)
+    static volatile Engine mapleEngine;
     public Transformation mFactor, mapleFactorTr
 
     public Setup(boolean projectCC) {
@@ -183,7 +184,8 @@ class Setup implements AutoCloseable {
 
         mathematicaKernel = MathLinkFactory.createKernelLink(args)
         mathematicaKernel.discardAnswer();
-        mapleEngine = new Engine(['java'] as String[], new EngineCallBacksDefault(), null, null)
+        if (mapleEngine == null)
+            mapleEngine = new Engine(['java'] as String[], new EngineCallBacksDefault(), null, null)
 
         def mop = { tensor, func, bindings, e = this.&wolframFunc ->
             def t = e(func, bindings)
@@ -400,6 +402,8 @@ class Setup implements AutoCloseable {
                     & 'p_m[fl]*p^m[fl] = (2*m[fl])**2'.t
                     & totalSpinProjector['axial']
                     & Together
+                    & ExpandAll[EliminateMetrics] & EliminateMetrics & Together
+                    & factor
             ) >> A
             // Define
             effVertices['axial'] = 'Aaxial_{aA bB}[fl, k1_m, k2_m]'.t.eq AAxial
@@ -412,6 +416,8 @@ class Setup implements AutoCloseable {
                     & ExpandAll[EliminateMetrics] & EliminateMetrics
                     & 'p_m[fl]*p^m[fl] = (2*m[fl])**2'.t
                     & Together
+                    & ExpandAll[EliminateMetrics] & EliminateMetrics & Together
+                    & factor
             ) >> A
             // Define
             effVertices['tensor'] = 'Atensor_{aA bB}[fl, k1_m, k2_m]'.t.eq ATensor
@@ -494,7 +500,7 @@ class Setup implements AutoCloseable {
     ////////////////////////////////////////// CALC ///////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    def spinorStructures, spinorStructuresVars, spinorSquares
+    def spinorStructures, spinorStructuresVars, spinorSquares, conjugateSpinorL
 
     void setupSpinorStructures() {
         if (spinorStructures != null)
@@ -516,11 +522,14 @@ class Setup implements AutoCloseable {
             subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
 
+
             spinorStructuresVars = []
+            conjugateSpinorL = Identity
             for (int i = 0; i < subs.size(); ++i) {
                 def l = "L${i + 1}${subs[i].indices.free}".t
                 subs[i] = subs[i].eq l
                 spinorStructuresVars << l
+                conjugateSpinorL &= "$l = c$l".t
             }
 
             spinorStructures = subs as Transformation
@@ -533,7 +542,7 @@ class Setup implements AutoCloseable {
 
             for (int i = 0; i < subs.size(); ++i)
                 for (int j = 0; j < subs.size(); ++j) {
-                    def lhs = subs[i][1] * (conjugate >> subs[j][1])
+                    def lhs = subs[i][1] * ((conjugate & conjugateSpinorL) >> subs[j][1])
                     def rhs = subs[i][0] * (conjugate >> subs[j][0])
                     rhs <<= epsSum & uTrace & mandelstam & dTraceSimplify &
                             fullSimplify & massesSubs & uSimplify & massesSubs & wFactor
@@ -593,6 +602,8 @@ class Setup implements AutoCloseable {
         squareMatrixElement(matrixElement, null)
     }
 
+    public boolean doMapleFactorOnAmp2 = true
+
     Tensor squareMatrixElement(Tensor matrixElement, String spins) {
         use(Redberry) {
             if (matrixElement.class == Complex)
@@ -602,7 +613,7 @@ class Setup implements AutoCloseable {
 
             def wrap = { expr -> expr.class == Sum ? expr as List : [expr] }
             def mElements = wrap(matrixElement)
-            def conjugate = Conjugate & InvertIndices
+            def conjugate = Conjugate & InvertIndices & conjugateSpinorL
             //def conjugate = Conjugate & InvertIndices
             //conjugate &= Reverse[Matrix1, Matrix2]
             //conjugate &= conjugateSpinors
@@ -630,21 +641,11 @@ class Setup implements AutoCloseable {
                 def overallNum = (num_p.class == Product ? num_p.indexlessSubProduct : '1'.t) * (cNum_p.class == Product ? cNum_p.indexlessSubProduct : 1.t) * numSb.build()
                 log 'done term:'
                 assert isSymbolic(overallNum)
-                //overallNum <<= mapleFactorTr
+                if (doMapleFactorOnAmp2)
+                    overallNum <<= mapleFactorTr
                 log(info(overallNum))
 
                 def den = (Denominator >> part) * (Denominator >> cPart)
-
-//                    println 'num info'
-//                    println info(num)
-//                    StringBuilder sb = new StringBuilder()
-//                    sb.append("r := ").append(num.toString(OutputFormat.Maple)).append(":")
-
-//                    new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.maple') << sb.toString()
-//                    new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res.redberry') << num.toString(OutputFormat.Redberry)
-
-//                    println info(num)
-
                 result << (overallNum / den)
             }
 
@@ -678,37 +679,9 @@ class Setup implements AutoCloseable {
             Product part = t
             def indexless = part.indexlessSubProduct
             def tensor = part.dataSubProduct
-
-//            println '  '
-//            println '  '
-//            println '  '
-//            tensor.each {
-//                println it
-//            }
-//
-//            fileTensors << tensor.toString(OutputFormat.Redberry)
-//            fileTensors << '\n'
-
-            //tensor <<= epsSum & uTrace & mandelstam & dTraceSimplify &
-            //        fullSimplify & massesSubs & uSimplify & massesSubs
             tensor <<= spinorSquares & epsSum & fullSimplifyE & massesSubs & uSimplify & massesSubs
-
-//            def var = "expr${counter++}"
-//            StringBuilder sb = new StringBuilder()
-//            sb.append(var).append(' = ').append(tensor).append(';\n')
-//            fileRedberry << sb.toString()
-//            sb = new StringBuilder()
-//            sb.append(var).append(' = ').append(tensor.toString(WolframMathematica)).append(';\n')
-//            fileMathematica << sb.toString()
-//            sb = new StringBuilder()
-//            sb.append(var).append(' := ').append(tensor.toString(Maple)).append(':\n')
-//            fileMaple << sb.toString()
-
             assert isSymbolic(tensor)
             def res = indexless * tensor
-//            println 'r done: w'
-//            res <<= wolframFactorTr
-//            println 'w done'
             return res
         }
     }

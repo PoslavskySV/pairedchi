@@ -48,38 +48,44 @@ public final class RunCC implements Process {
 
     @Override
     public void run() {
-        if (parameters.ward())
-            SetupCC.ward(parameters.getSpin(), parameters.getOutputFile());
-        else
-            SetupCC.calc(parameters.getSpin(), parameters.getOutputFile());
+        SetupCC.calc(parameters.getSpin(), parameters.g1, parameters.g2, parameters.getOutputFile());
     }
 
     @Parameters(commandDescription = "Run process g + g -> chi_b + c + cBar",
             optionPrefixes = "-")
     public static final class RunCCParameters extends ProcessParameters {
-        @Parameter(description = "bottomSpin output_file")
+        @Parameter(description = "output_file")
         public List<String> params;
 
-        @Parameter(names = {"-w", "--ward"}, description = "Ward check only: replace gluon polarizations with momentums")
-        public Boolean ward;
+        //@Parameter(names = {"-w", "--ward"}, description = "Ward check only: replace gluon polarizations with momentums")
+        //public Boolean ward;
+
+        @Parameter(names = {"-g1", "--g1"}, description = "First gluon polarization")
+        public int g1;
+
+        @Parameter(names = {"-g2", "--g2"}, description = "Second gluon polarization")
+        public int g2;
+
+        @Parameter(names = {"-spin", "--bottomSpin"}, description = "Spin of bottomonium")
+        public String bottomSpin;
 
         @Override
         public String getOutputFileName() {
-            return params.get(1);
+            return params.get(0);
         }
 
         public String getSpin() {
-            return params.get(0).toLowerCase();
-        }
-
-        public boolean ward() {
-            return ward != null && ward;
+            return bottomSpin.toLowerCase();
         }
 
         @Override
         public void validate() {
-            if (params.size() != 2)
-                throw new ParameterException("Missing arguments.");
+            if (params.size() != 1)
+                throw new ParameterException("No output file specified.");
+            if (g1 != -1 && g1 != 1)
+                throw new ParameterException("First gluon spin is not specified.");
+            if (g2 != -1 && g2 != 1)
+                throw new ParameterException("Second gluon spin is not specified.");
             switch (getSpin()) {
                 case "scalar":
                 case "axial":

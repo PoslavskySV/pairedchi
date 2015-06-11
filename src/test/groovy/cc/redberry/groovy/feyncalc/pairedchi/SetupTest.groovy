@@ -23,7 +23,6 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
-import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.core.transformations.Transformation
 import cc.redberry.core.utils.TensorUtils
@@ -34,7 +33,6 @@ import org.junit.Ignore
 import org.junit.Test
 
 import static cc.redberry.core.indices.IndexType.*
-import static cc.redberry.core.utils.TensorUtils.info
 import static cc.redberry.groovy.RedberryPhysics.DiracTrace
 import static cc.redberry.groovy.RedberryPhysics.mandelstam
 import static cc.redberry.groovy.RedberryStatic.*
@@ -97,7 +95,7 @@ class SetupTest {
     @Test
     public void testEffectiveVertex1() throws Exception {
         use(Redberry) {
-            def stp = new Setup(true)
+            def stp = new Setup(true, true)
             def vertices = stp.effectiveQuarkoniaVertices()
             for (fl in ['charm', 'bottom'])
                 for (spin in ['scalar', 'axial', 'tensor']) {
@@ -394,113 +392,27 @@ class SetupTest {
             }
 
             def conjugate = Conjugate
-            conjugate &= InvertIndices[LatinUpper] & '{i -> a, j -> b}'.mapping
+            conjugate &= InvertIndices[LatinUpper]
             conjugate &= Reverse[Matrix1, Matrix2]
             conjugate &= stp.conjugateSpinors
+            def ren = '{i -> a, j -> b}'.mapping
 
             for (int i = 0; i < subs.size(); ++i)
                 for (int j = 0; j < subs.size(); ++j) {
-                    def lhs = subs[i][1] * (conjugate >> subs[j][1])
-                    def rhs = subs[i][0] * (conjugate >> subs[j][0])
-                    rhs <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
+                    def lhs = subs[i][1] * ((conjugate & ren) >> subs[j][1])
+
+                    def rhs1 = subs[i][0] * ((conjugate & ren) >> subs[j][0])
+                    rhs1 <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
                             stp.fullSimplify & stp.massesSubs & stp.uSimplify & stp.massesSubs & stp.wFactor
 
-                    println lhs.eq(rhs)
+                    def rhs2 = (conjugate >> subs[i][0]) * (ren >> subs[j][0])
+                    rhs2 <<= stp.epsSum & stp.uTrace & stp.mandelstam & stp.dTraceSimplify &
+                            stp.fullSimplify & stp.massesSubs & stp.uSimplify & stp.massesSubs & stp.wFactor
+
+                    println(stp.mFactor >> (rhs1 - rhs2))
                 }
         }
     }
 
-    
-    @Test
-    public void testProcess_chi() throws Exception {
-        use(Redberry) {
-            println CC.nameManager.seed
-
-            def stp = new SetupChi()
-            def charmSpin = 'scalar', bottomSpin = 'scalar'
-
-            def M2 = '0'.t
-            for (def g1 in [1, -1])
-                for (def g2 in [1, -1]) {
-                    def pols = stp.setupPolarisations(g1, g2)
-                    M2 += stp.calcProcess(stp.diagrams(charmSpin, bottomSpin), pols)
-                }
-            M2 <<= stp.wolframFactorTr
-            println M2
-            println M2.toString(OutputFormat.WolframMathematica)
-        }
-    }
-
-    @Test
-    public void testProcess_cc() throws Exception {
-        use(Redberry) {
-            //-8955305736816440593
-            println CC.nameManager.seed
-
-            def stp = new SetupCC()
-            stp.setupSpinorStructures()
-
-            def bottomSpin = 'scalar'
-
-            def pols = stp.setupPolarisations(1, 1)
-            def M2 = stp.calcProcess(stp.diagrams(bottomSpin), pols)
-
-            StringBuilder sb = new StringBuilder()
-            sb.append("r := ").append(M2.toString(OutputFormat.Maple)).append(":")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.maple') << sb.toString()
-
-            sb = new StringBuilder()
-            sb.append("r = ").append(M2.toString(OutputFormat.WolframMathematica)).append(";")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.m') << sb.toString()
-
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res1.redberry') << M2.toString(OutputFormat.Redberry)
-
-            println info(M2)
-            M2 <<= 's = 5*x**2'.t & 't1 = 23*x**2'.t & 't2 = 13*x**2'.t & 'u1 = 12*x**2'.t & 'u2 = 523*x**2'.t & 'mb = 32*x'.t & 'mc = 11*x'.t
-            M2 <<= stp.mapleFactorTr
-            println M2
-        }
-    }
-
-
-    @Test
-    public void testProcess_cc_all() throws Exception {
-        use(Redberry) {
-            //-8955305736816440593
-            println CC.nameManager.seed
-
-            def stp = new SetupCC()
-            stp.setupSpinorStructures()
-
-            def bottomSpin = 'scalar'
-
-            def M2 = 0.t
-            for (def g1 in [1, -1])
-                for (def g2 in [1, -1]) {
-                    stp.log '###########'
-                    stp.log "pols : $g1 $g2"
-                    stp.log '###########'
-
-                    def pols = stp.setupPolarisations(g1, g2)
-                    M2 += stp.calcProcess(stp.diagrams(bottomSpin), pols)
-                }
-
-
-            StringBuilder sb = new StringBuilder()
-            sb.append("r := ").append(M2.toString(OutputFormat.Maple)).append(":")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.maple') << sb.toString()
-
-            sb = new StringBuilder()
-            sb.append("r = ").append(M2.toString(OutputFormat.WolframMathematica)).append(";")
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.m') << sb.toString()
-
-            new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/res_all.redberry') << M2.toString(OutputFormat.Redberry)
-
-            println info(M2)
-            M2 <<= 's = 5*x**2'.t & 't1 = 23*x**2'.t & 't2 = 13*x**2'.t & 'u1 = 12*x**2'.t & 'u2 = 523*x**2'.t & 'mb = 32*x'.t & 'mc = 11*x'.t
-            M2 <<= stp.mapleFactorTr
-            println M2
-        }
-    }
 }
 

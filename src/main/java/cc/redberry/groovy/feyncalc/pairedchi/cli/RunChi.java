@@ -48,38 +48,49 @@ public final class RunChi implements Process {
 
     @Override
     public void run() {
-        //if(parameters.g1 != null && parameters.g)
-        SetupChi.calc(parameters.g1, parameters.g2, null, null, parameters.getBottomSpin(), parameters.getCharmSpin(), parameters.getOutputFile());
+        SetupChi.calc(parameters.getCharmSpin(), parameters.getBottomSpin(),
+                parameters.g1, parameters.g2, parameters.getOutputFile());
     }
 
     @Parameters(commandDescription = "Run process g + g -> chi_b + chi_c",
             optionPrefixes = "-")
     public static final class RunChiParameters extends ProcessParameters {
-        @Parameter(description = "bottomSpin charmSpin output_file")
+        @Parameter(description = "output_file")
         public List<String> params;
 
-        @Parameter(names = {"--g1"}, description = "First gluon spin (1 or -1)")
-        public Integer g1;
-        @Parameter(names = {"--g2"}, description = "Second gluon spin (1 or -1)")
-        public Integer g2;
+        @Parameter(names = {"-g1", "--g1"}, description = "First gluon polarization")
+        public int g1;
+
+        @Parameter(names = {"-g2", "--g2"}, description = "Second gluon polarization")
+        public int g2;
+
+        @Parameter(names = {"-bSpin", "--bottomSpin"}, description = "Spin of bottomonium")
+        public String bottomSpin;
+
+        @Parameter(names = {"-cSpin", "--charmSpin"}, description = "Spin of charmonium")
+        public String charmSpin;
 
         @Override
         public String getOutputFileName() {
-            return params.get(2);
+            return params.get(0);
         }
 
         public String getBottomSpin() {
-            return params.get(0).toLowerCase();
+            return bottomSpin.toLowerCase();
         }
 
         public String getCharmSpin() {
-            return params.get(1).toLowerCase();
+            return charmSpin.toLowerCase();
         }
 
         @Override
         public void validate() {
-            if (params.size() != 3)
+            if (params.size() != 1)
                 throw new ParameterException("Missing arguments.");
+            if (g1 != -1 && g1 != 1)
+                throw new ParameterException("First gluon spin is not specified.");
+            if (g2 != -1 && g2 != 1)
+                throw new ParameterException("Second gluon spin is not specified.");
             for (String spin : new String[]{getBottomSpin(), getCharmSpin()})
                 switch (spin) {
                     case "scalar":
