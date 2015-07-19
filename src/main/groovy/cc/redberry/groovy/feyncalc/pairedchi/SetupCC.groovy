@@ -78,9 +78,13 @@ class SetupCC extends Setup {
             def qMf = 'cu[p1_m[bottom]]*V_cC*Vcc^cC*D[p1_m[bottom] + pCharm_m, m[bottom]]*V_aA*eps1^a[h1]*D[k2_m - p2_m[bottom], m[bottom]]*V_bB*eps2^b[h2]*v[p2_m[bottom]]'.t
 
             def gcc = 'Vcc_iI = G_ij[p1_m[charm] + p2_m[charm]]*cu[p1_m[charm]]*V^j_I*v[p2_m[charm]]'.t
+            log('preparing quark diagrams ', System.out.&print)
             for (def qM in [qMa, qMb, qMc, qMd, qMe, qMf]) {
+                log('.', System.out.&print, false)
                 diagrams += calcQAmp(qM, bottomSpin)
             }
+            System.out.print('\n')
+            log 'preparing quark diagrams ...... done'
             diagrams = diagrams.collect({ it << (gcc & EliminateMetrics) })
             log '... done'
             return diagrams

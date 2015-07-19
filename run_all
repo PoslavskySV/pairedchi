@@ -1,0 +1,7 @@
+#!/bin/bash
+
+
+./bbcc cc -f -spin scalar -g1 1 -g2 1 output/cc11.redberry
+./bbcc cc -f -spin scalar -g1 1 -g2 -1 output/cc1-1.redberry
+./bbcc cc -f -spin scalar -g1 -1 -g2 1 output/cc-11.redberry
+./bbcc cc -f -spin scalar -g1 -1 -g2 -1 output/cc-1-1.redberry

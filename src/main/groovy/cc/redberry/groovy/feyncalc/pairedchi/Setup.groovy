@@ -22,6 +22,7 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi
 
+import cc.redberry.core.context.CC
 import cc.redberry.core.number.Complex
 import cc.redberry.core.tensor.*
 import cc.redberry.core.transformations.Transformation
@@ -76,7 +77,8 @@ class Setup implements AutoCloseable {
 
     /** Transformations */
     public def mandelstam, massesSubs, momentums,
-               dTrace, dTraceSimplify, dSimplify, uTrace, uSimplify, leviSimplify, fullSimplify, fullSimplifyE,
+               dTrace, dTraceSimplify, dSimplify, uTrace, uSimplify, leviSimplify,
+               simplifyMetrics, fullSimplify, fullSimplifyE,
                conjugateSpinors, momentumConservation
 
     /**
@@ -106,6 +108,7 @@ class Setup implements AutoCloseable {
 
     void init() {//basic initialization
         use(Redberry) {
+            log "Started with seed ${CC.nameManager.seed}"
             log 'Setting up basic tensors'
 
             //Setting up matrix objects
@@ -308,7 +311,7 @@ class Setup implements AutoCloseable {
             massesSubs = 'm[charm] = mc'.t.hold & 'm[bottom] = mb'.t.hold
 
             /** Full simplification */
-            def simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam &
+            simplifyMetrics = EliminateMetrics & simplifyPolarizations & mandelstam &
                     'd^i_i = 4'.t & 'd^A_A = 8'.t & "d^i'_i' = 4".t & "d^A'_A' = 3".t
             if (projectCC)
                 simplifyMetrics &= 'e_abcd * p^a[charm] * p^b[bottom] * k1^c * k2^d = 0'.t
@@ -368,7 +371,7 @@ class Setup implements AutoCloseable {
         if (quarkoniaVertices != null)
             return quarkoniaVertices;
 
-        log 'Calculating effective vertex'
+        log 'Calculating effective vertex ...'
         use(Redberry) {
             def effVertices = [:]
 
@@ -391,7 +394,6 @@ class Setup implements AutoCloseable {
                     & ExpandAll[EliminateMetrics] & EliminateMetrics & Together
                     & factor
             ) >> A
-            //TODO factor for others!!!
 
             // Define
             effVertices['scalar'] = 'Ascalar_{aA bB}[fl, k1_m, k2_m]'.t.eq AScalar
@@ -422,6 +424,7 @@ class Setup implements AutoCloseable {
             // Define
             effVertices['tensor'] = 'Atensor_{aA bB}[fl, k1_m, k2_m]'.t.eq ATensor
 
+            log '...done'
             return quarkoniaVertices = Collections.unmodifiableMap(effVertices)
         }
     }
@@ -567,13 +570,20 @@ class Setup implements AutoCloseable {
 
             //processing numerator
             def num = Numerator >> amp
-            num <<= polarizations & fullSimplify & uTrace & EliminateMetrics & massesSubs
+            num <<= polarizations & fullSimplifyE & uTrace & EliminateMetrics & massesSubs
 
             //reducing spinor structures
             num <<= dSimplify
             num <<= EliminateMetrics & massesSubs
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
-            num <<= fullSimplifyE & EliminateMetrics & dSimplify & massesSubs
+
+            //instead of fullSimplifyE
+            num <<= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics
+            num <<= LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
+            num <<= ExpandTensors[simplifyMetrics] & simplifyMetrics
+
+
+            num <<= EliminateMetrics & dSimplify & massesSubs
             num = Transformation.Util.applyUntilUnchanged(num, 'G5*G_a = -G_a*G5'.t)
 
             //replacing spinor structures
@@ -665,12 +675,6 @@ class Setup implements AutoCloseable {
         }
     }
 
-    def fileTensors = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tensors.redberry')
-    def fileRedberry = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/exprs.redberry')
-    def fileMaple = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/exprs.maple')
-    def fileMathematica = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/exprs.m')
-    def counter = 0
-
     Tensor calcProduct(Tensor t) {
         use(Redberry) {
             if (t.class != Product)
@@ -686,11 +690,15 @@ class Setup implements AutoCloseable {
         }
     }
 
-    void log(String msg) {
+    void log(String msg, func = System.out.&println, printElapsed = true) {
         if (log) {
-            int dur = (System.currentTimeMillis() - startTime) / 1000
-            String elapsed = String.format("%d:%02d:%02d", (int) (dur / 3600), (int) (dur % 3600) / 60, (int) (dur % 60))
-            println("[Redberry $elapsed] " + msg)
+            if (!printElapsed)
+                func msg
+            else {
+                int dur = (System.currentTimeMillis() - startTime) / 1000
+                String elapsed = String.format("%d:%02d:%02d", (int) (dur / 3600), (int) (dur % 3600) / 60, (int) (dur % 60))
+                func("[Redberry $elapsed] " + msg)
+            }
         }
     }
 
