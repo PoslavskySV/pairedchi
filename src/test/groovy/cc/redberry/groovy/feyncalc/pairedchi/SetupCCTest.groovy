@@ -106,13 +106,13 @@ class SetupCCTest {
         use(Redberry) {
             CC.resetTensorNames(-2907357143612290431)
             SetupCC stp = new SetupCC()
-            def bottomSpin = 'axial'
+            def bottomSpin = 'tensor'
 
             def diags = stp.diagrams(bottomSpin)
             def pol = Identity //stp.setupPolarisations(1, 1)
 
             def i = 0
-            def file = new File('/Users/poslavsky/Downloads/amps.txt')
+            def file = new File('/Users/poslavsky/Downloads/amps_tensor.txt')
             file.delete()
 
             file << "\n\nMandelstam variables:\n\n"
@@ -132,7 +132,8 @@ class SetupCCTest {
                     'eps1_a[h1] = eps1_a'.t.hold &
                     'eps2_a[h2] = eps2_a'.t.hold &
                     'p_a[bottom] = p_a'.t.hold &
-                    'eps_{a}[h[bottom]] = epsP_a'.t.hold
+                    'eps_{a}[h[bottom]] = epsP_a'.t.hold &
+                    'eps_{ab}[h[bottom]] = epsP_ab'.t.hold
 
             file << "\n\nAmplitudes:\n\n"
             for (def diag in diags) {
