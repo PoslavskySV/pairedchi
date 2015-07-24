@@ -103,16 +103,18 @@ class SetupCCTest {
 
     @Test
     public void printAmp() throws Exception {
+
         use(Redberry) {
             CC.resetTensorNames(-2907357143612290431)
             SetupCC stp = new SetupCC()
-            def bottomSpin = 'tensor'
+            //axial: 21369 (not projected), 51048 (1, 1)
+            def bottomSpin = 'axial'
 
             def diags = stp.diagrams(bottomSpin)
-            def pol = Identity //stp.setupPolarisations(1, 1)
+            def pol = stp.setupPolarisations(1, -1)
 
             def i = 0
-            def file = new File('/Users/poslavsky/Downloads/amps_tensor.txt')
+            def file = new File("/Users/poslavsky/Downloads/amps_${bottomSpin}.txt")
             file.delete()
 
             file << "\n\nMandelstam variables:\n\n"
@@ -167,7 +169,7 @@ class SetupCCTest {
             def pol = Identity //stp.setupPolarisations(1, 1)
 
             def i = 0
-            def file = new File('/Users/poslavsky/Downloads/amps.txt')
+            def file = new File('/Users/poslavsky/Downloads/amps_axial.txt')
             file.delete()
 
             file << "\n\nMandelstam variables:\n\n"

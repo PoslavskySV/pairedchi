@@ -568,9 +568,14 @@ class Setup implements AutoCloseable {
             den <<= ExpandAndEliminate & mandelstam & mandelstam & massesSubs & wFactor
             assert isSymbolic(den)
 
+            def fsE= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
+                    LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]] &
+                    ExpandTensors[simplifyMetrics] & simplifyMetrics
+
             //processing numerator
             def num = Numerator >> amp
-            num <<= polarizations & fullSimplifyE & uTrace & EliminateMetrics & massesSubs
+            num <<= polarizations & fsE & uTrace & EliminateMetrics & massesSubs
+
 
             //reducing spinor structures
             num <<= dSimplify
@@ -578,10 +583,7 @@ class Setup implements AutoCloseable {
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
 
             //instead of fullSimplifyE
-            num <<= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics
-            num <<= LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
-            num <<= ExpandTensors[simplifyMetrics] & simplifyMetrics
-
+            num <<= fsE
 
             num <<= EliminateMetrics & dSimplify & massesSubs
             num = Transformation.Util.applyUntilUnchanged(num, 'G5*G_a = -G_a*G5'.t)
@@ -589,6 +591,7 @@ class Setup implements AutoCloseable {
             //replacing spinor structures
             num <<= spinorStructures
             num <<= Collect[*spinorStructuresVars, wFactor, [ExpandSymbolic: false]]
+
             log "Amplitude (numerator) info: ${info(num)}"
             //num.each { println it.dataSubProduct }
             return num / den
@@ -721,6 +724,6 @@ class Setup implements AutoCloseable {
 
     static void checkPol(g) {
         if (g != null && g != 1 && g != -1)
-            throw new IllegalArgumentException()
+             throw new IllegalArgumentException()
     }
 }
