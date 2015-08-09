@@ -1,0 +1,9 @@
+
+#!/bin/bash
+mapleLibraryPath="/Library/Frameworks/Maple.framework/Versions/18/bin.APPLE_UNIVERSAL_OSX"
+maplePath="/Library/Frameworks/Maple.framework/Versions/18"
+export MAPLE="$maplePath"
+jlinkPath="/Applications/Mathematica.app/SystemFiles/Links/JLink/JLink.jar"
+export DYLD_LIBRARY_PATH="$mapleLibraryPath"
+classpath="${jlinkPath}:${maplePath}/java/jopenmaple.jar:${maplePath}/java/externalcall.jar:target/bbcc.jar"
+java -Xmx6g -Xms5g -XX:+AggressiveOpts -Djava.library.path="$mapleLibraryPath" -cp ${classpath} cc.redberry.groovy.feyncalc.pairedchi.cli.Main1

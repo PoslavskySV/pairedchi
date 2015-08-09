@@ -35,10 +35,7 @@ import com.wolfram.jlink.MathLinkFactory
 
 import static cc.redberry.core.context.OutputFormat.Maple
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
-import static cc.redberry.core.indices.IndexType.Matrix1
-import static cc.redberry.core.indices.IndexType.Matrix2
-import static cc.redberry.core.tensor.Tensors.setAntiSymmetric
-import static cc.redberry.core.tensor.Tensors.setSymmetric
+import static cc.redberry.core.indices.IndexType.*
 import static cc.redberry.core.utils.TensorUtils.info
 import static cc.redberry.core.utils.TensorUtils.isSymbolic
 import static cc.redberry.groovy.RedberryPhysics.*
@@ -120,11 +117,11 @@ class Setup implements AutoCloseable {
                     'D[p_m, mass]', Matrix1.matrix //quark propagator
 
             //Levi-Civita, SU(N) symmetric and structure tensors
-            Quiet { setAntiSymmetric 'e_abcd' }
-            Quiet { setSymmetric 'd_ABC' }
-            Quiet { setAntiSymmetric 'f_ABC' }
+            Quiet { Tensors.setAntiSymmetric('e_abcd') }
+            Quiet { Tensors.setSymmetric('d_ABC') }
+            Quiet { Tensors.setAntiSymmetric('f_ABC') }
             //polarization tensor
-            Quiet { setSymmetric 'eps_ab[h]' }
+            Quiet { Tensors.setSymmetric('eps_ab[h]') }
 
             setupFeynRules()
             setupProjectors()
@@ -259,9 +256,10 @@ class Setup implements AutoCloseable {
                 spinSingletProjector[fl] = "v[p2_m[$fl]]*cu[p1_m[$fl]] = (p2_m[$fl]*G^m - m[$fl]) * epsS_m[$fl] * G^m * (p1_m[$fl]*G^m + m[$fl])".t
 
                 // total spin projection
-                totalSpinProjector['scalar'] &= "q_i[$fl]*epsS_j[$fl] = -J_ij[p_i[$fl], 2*m[$fl]]".t
-                totalSpinProjector['axial'] &= "q_i[$fl]*epsS_j[$fl] = e_ijab * p^a[$fl] * eps^b[h[$fl]]".t
-                totalSpinProjector['tensor'] &= "q_i[$fl]*epsS_j[$fl] = eps_ij[h[$fl]]".t
+                def s = "q_i[$fl]*epsS_j[$fl] = eps_i[hS[$fl]]*eps_j[hL[$fl]]".t
+                totalSpinProjector['scalar'] &= s;
+                totalSpinProjector['axial'] &= s;
+                totalSpinProjector['tensor'] &= s
 
                 //sum over polarizations for axial meson
                 epsSum &= "eps_a[h[$fl]]*eps_b[h[$fl]] = J_ab[p_a[$fl], 2*m[$fl]]".t
@@ -296,14 +294,18 @@ class Setup implements AutoCloseable {
             //Mandelstam variables and mass shell
             if (projectCC)
                 mandelstam = setMandelstam([k1_m: '0', k2_m: '0', 'p_m[charm]': '2*m[charm]', 'p_m[bottom]': '2*m[bottom]'])
-            else
+            else {
                 mandelstam = setMandelstam5([k1_m: '0', k2_m: '0', 'p1_m[charm]': 'm[charm]', 'p2_m[charm]': 'm[charm]', 'p_m[bottom]': '2*m[bottom]'])
+                mandelstam &= 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
+            }
 
             /** Simplifications of polarizations */
             def simplifyPolarizations = 'eps1^a[h1] * k1_a = 0'.t &
                     'eps2^a[h2] * k2_a = 0'.t &
                     'eps^a[h[charm]] * p_a[charm] = 0'.t &
                     'eps^a[h[bottom]] * p_a[bottom] = 0'.t &
+                    'eps^a[hS[bottom]] * p_a[bottom] = 0'.t &
+                    'eps^a[hL[bottom]] * p_a[bottom] = 0'.t &
                     'eps^ab[h[charm]] * p_a[charm] = 0'.t &
                     'eps^ab[h[bottom]] * p_a[bottom] = 0'.t
 
@@ -342,6 +344,13 @@ class Setup implements AutoCloseable {
                 def b = '{_i -> _j}'.mapping >> a
                 def c = '{_i -> ^i}'.mapping >> a
                 dSimplify &= mandelstam >> "G^i * G^j * $a * $b = $a * $c".t
+            }
+
+            if (!projectCC) {
+                dSimplify &= 'cu[p1_m[charm]]*G_i*p1^i[charm] = cu[p1_m[charm]]*m[charm]'.t
+                dSimplify &= 'cu[p1_m[charm]]*G5*G_i*p1^i[charm] = -cu[p1_m[charm]]*G5*m[charm]'.t
+                dSimplify &= 'G_i*p2^i[charm]*v[p2^i[charm]] = -m[charm]*v[p2^i[charm]]'.t
+                dSimplify &= 'G_i*p2^i[charm]*G5*v[p2^i[charm]] = m[charm]*G5*v[p2^i[charm]]'.t
             }
 
             if (projectCC)
@@ -473,8 +482,6 @@ class Setup implements AutoCloseable {
             def eps2 = 'eps2_a = c4 * e_abcd * k1^b * k2^c * p^d[bottom]'.t
             def epsPlus = 'eps_a[1] = eps1_a '.t << eps1 << eps2
             def epsMinus = 'eps_a[-1] = eps2_a'.t << eps1 << eps2
-//            def epsPlus = 'eps_a[1] = (eps1_a + I * eps2_a)/2**(1/2)'.t << eps1 << eps2
-//            def epsMinus = 'eps_a[-1] = (eps1_a - I * eps2_a)/2**(1/2)'.t << eps1 << eps2
 
             if (projectCC) {
                 cfs &= 'c1 = 4*mb**2 - t'.t
@@ -499,6 +506,75 @@ class Setup implements AutoCloseable {
         }
     }
 
+    def qqXYZCoeffs = [:]
+
+    def calcQQXYZCoeffs(fl) {
+        if (qqXYZCoeffs[fl] != null)
+            return qqXYZCoeffs[fl]
+        use(Redberry) {
+            def var = fl[0] + 's'
+
+            def eps1 = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t
+            def eps2 = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t
+            def eps0 = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t
+
+            if (!projectCC) {
+                def subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
+                eps1 <<= subs; eps2 <<= subs; eps0 <<= subs;
+            }
+
+            def eq = ["p_a[$fl] * eps1^a = 0".t,
+                      "p_a[$fl] * eps2^a = 0".t,
+                      "p_a[$fl] * eps0^a = 0".t,
+                      'eps1_a * eps2^a = 0'.t,
+                      'eps1_a * eps1^a = -1'.t,
+                      'eps2_a * eps2^a = -1'.t,
+                      'eps0_a * eps0^a = -1'.t]
+            eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
+                    ExpandAndEliminate & mandelstam & massesSubs) >> eq
+            def solverOptions = [ExternalSolver: [
+                    Solver: 'Mathematica',
+                    Path  : '/Applications/Mathematica.app/Contents/MacOS']]
+            def solutions = Reduce(eq,
+                    ["${var}1", "${var}2", "${var}3", "${var}4", "${var}5", "${var}6"].t,
+                    solverOptions)
+            assert solutions.size() != 0
+
+            def cfs = solutions[0]
+            cfs = (wolframFactorTr & wolframFactorSqrtTr) >> cfs
+            return (qqXYZCoeffs[fl] = cfs)
+        }
+    }
+
+    Map getXYZVector(def fl, def xyz) {
+        use(Redberry) {
+            def var = fl[0] + 's', epss = [:]
+
+            def subs = Identity
+            if (!projectCC)
+                subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
+            epss['x'] = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t << subs
+            epss['y'] = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t << subs
+            epss['z'] = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t << subs
+
+
+            def coeffs = calcQQXYZCoeffs(fl)
+            def eps = epss[xyz][1] << coeffs
+            eps <<= Together
+            return ['den': Denominator >> eps, 'num': Numerator >> eps]
+        }
+    }
+
+    Map setXYZ(def fl, def spin, def angular) {
+        use(Redberry) {
+            def vSpin = getXYZVector(fl, spin),
+                vAngular = getXYZVector(fl, angular)
+            return [den: vSpin['den'] * vAngular['den'],
+                    tr : bind(["eps_i[hS[$fl]]": vSpin['num']]).hold &
+                            bind(["eps_i[hL[$fl]]": vAngular['num']]).hold]
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////// CALC ///////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -513,6 +589,7 @@ class Setup implements AutoCloseable {
             def subs = []
             subs << 'cu[p1_m[charm]]*g_AB*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*T_A*T_B*G5*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*G^i*g_AB*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*G^i*G5*g_AB*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*v[p2_m[charm]]'.t
@@ -522,6 +599,9 @@ class Setup implements AutoCloseable {
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
 
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
+
             subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
 
@@ -530,6 +610,9 @@ class Setup implements AutoCloseable {
             conjugateSpinorL = Identity
             for (int i = 0; i < subs.size(); ++i) {
                 def l = "L${i + 1}${subs[i].indices.free}".t
+                findIndicesSymmetries('_AB'.si, subs[i]).each {
+                    Tensors.addSymmetry(l, LatinUpper, it)
+                }
                 subs[i] = subs[i].eq l
                 spinorStructuresVars << l
                 conjugateSpinorL &= "$l = c$l".t
@@ -568,14 +651,14 @@ class Setup implements AutoCloseable {
             den <<= ExpandAndEliminate & mandelstam & mandelstam & massesSubs & wFactor
             assert isSymbolic(den)
 
-            def fsE= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
-                    LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]] &
+            def ls = LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
+            def fsE = simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
+                    ls &
                     ExpandTensors[simplifyMetrics] & simplifyMetrics
 
             //processing numerator
             def num = Numerator >> amp
             num <<= polarizations & fsE & uTrace & EliminateMetrics & massesSubs
-
 
             //reducing spinor structures
             num <<= dSimplify
@@ -588,6 +671,16 @@ class Setup implements AutoCloseable {
             num <<= EliminateMetrics & dSimplify & massesSubs
             num = Transformation.Util.applyUntilUnchanged(num, 'G5*G_a = -G_a*G5'.t)
 
+            def reduceSpinorStructs = momentumConservation & ExpandTensors[simplifyMetrics] &
+                    simplifyMetrics & ls & dSimplify & massesSubs &
+                    'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t &
+                    'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t &
+                    ExpandTensors[simplifyMetrics] & simplifyMetrics & ls &
+                    dSimplify & massesSubs & mFactor
+
+            log 'Reducing spinor structures ...'
+            num <<= reduceSpinorStructs & 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
+            log 'Reducing spinor structures ... done'
             //replacing spinor structures
             num <<= spinorStructures
             num <<= Collect[*spinorStructuresVars, wFactor, [ExpandSymbolic: false]]
@@ -724,6 +817,6 @@ class Setup implements AutoCloseable {
 
     static void checkPol(g) {
         if (g != null && g != 1 && g != -1)
-             throw new IllegalArgumentException()
+            throw new IllegalArgumentException()
     }
 }

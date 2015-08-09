@@ -73,7 +73,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>cc.redberry.groovy.feyncalc.pairedchi.cli.Main</mainClass>
+                            <mainClass>cc.redberry.groovy.feyncalc.pairedchi.cli.Main1</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

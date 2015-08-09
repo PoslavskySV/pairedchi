@@ -262,6 +262,14 @@ class SetupTest {
         }
     }
 
+    @Test
+    public void testXYZ() throws Exception {
+        use(Redberry) {
+            def stp = new Setup(false, true)
+            println stp.setXYZ('bottom', 'z', 'x')
+        }
+    }
+
     @Ignore
     @Test
     public void testMultiplicationTable() throws Exception {
@@ -414,5 +422,28 @@ class SetupTest {
         }
     }
 
+    @Test
+    public void testName() throws Exception {
+        use(Redberry) {
+            def f = new File('/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/cc1-1.redberry')
+            StringBuilder sb = new StringBuilder()
+            f.eachLine {
+                sb.append(it)
+            }
+            def t = sb.toString().t
+
+            t <<= 't1=-684062/1000'.t &
+                    't2=-110326/1000'.t &
+                    'u1=-434839/100000'.t &
+                    'u2=-499841/10000'.t &
+                    's=900'.t &
+                    'mc = 15/10'.t &
+                    'mb = 3'.t &
+                    'g= 1'.t
+            println t
+
+            println TensorUtils.info(t)
+        }
+    }
 }
 

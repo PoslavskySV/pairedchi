@@ -23,15 +23,10 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.OutputFormat
-import cc.redberry.core.tensor.FastTensors
-import cc.redberry.core.tensor.Product
-import cc.redberry.core.tensor.Sum
-import cc.redberry.core.tensor.SumBuilder
 import cc.redberry.groovy.Redberry
 import org.junit.Test
 
-import static cc.redberry.groovy.RedberryStatic.ExpandAndEliminate
-import static cc.redberry.groovy.RedberryStatic.Reduce
+import static cc.redberry.groovy.RedberryStatic.*
 
 /**
  * Created by poslavsky on 04/06/15.
@@ -131,10 +126,92 @@ class PolarizationsPlayground {
 
     @Test
     public void testQuarkoniaPolarizations() throws Exception {
-        Setup stp = new Setup(false, true, false)
-        println quarkoniaPolarizations(stp, 'bottom')
+        Setup stp = new Setup(true, true)
+        def coeffs = quarkoniaPolarizations(stp, 'charm')['coeffs']
+        coeffs.each {
+            println "def ${it[0]} = '$it'.t "
+        }
     }
 
+    static def coeffs = [:]
+
+    private static def calcCoeffs(Setup stp, fl) {
+        if (coeffs[fl] != null)
+            return coeffs[fl]
+        use(Redberry) {
+            def var = fl[0] + 's'
+
+            def eps1 = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t
+            def eps2 = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t
+            def eps0 = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t
+
+            if (!stp.projectCC) {
+                def subs = 'p_a[charm] = p1_a[charm] + p2_a[charm]'.t.hold
+                eps1 <<= subs; eps2 <<= subs; eps0 <<= subs;
+            }
+
+            def eq = ["p_a[$fl] * eps1^a = 0".t,
+                      "p_a[$fl] * eps2^a = 0".t,
+                      "p_a[$fl] * eps0^a = 0".t,
+                      'eps1_a * eps2^a = 0'.t,
+                      'eps1_a * eps1^a = -1'.t,
+                      'eps2_a * eps2^a = -1'.t,
+                      'eps0_a * eps0^a = -1'.t]
+            eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & stp.leviSimplify &
+                    ExpandAndEliminate & stp.mandelstam & stp.massesSubs) >> eq
+            def solutions = Reduce(eq, ["${var}1", "${var}2", "${var}3", "${var}4", "${var}5", "${var}6"].t, solverOptions)
+            assert solutions.size() != 0
+
+            def cfs = solutions[0]
+            cfs = (stp.wolframFactorTr & stp.wolframFactorSqrtTr) >> cfs
+            return (coeffs[fl] = cfs)
+        }
+    }
+
+    @Test
+    public void test1() throws Exception {
+        Setup stp = new Setup(false, true)
+        calcCoeffs(stp, 'bottom').each {
+            println(it.toString(OutputFormat.WolframMathematica) + ';')
+        }
+    }
+
+    private static def getVector(Setup stp, def fl, def xyz) {
+        use(Redberry) {
+            def var = fl[0] + 's', epss = [:]
+
+            epss['x'] = "eps1_a = ${var}1 * p_a[charm] + ${var}2 * p_a[bottom]".t
+            epss['y'] = "eps2_a = ${var}3 * p_a[charm] + ${var}4 * p_a[bottom] + ${var}5 * k1_a".t
+            epss['z'] = "eps0_a = ${var}6 * e_abcd * k1^b * p^c[charm] * p^d[bottom]".t
+
+            def coffs = calcCoeffs(stp, fl)
+            def eps = epss[xyz][1] << coffs
+            eps <<= Together
+            return ['den': Denominator >> eps, 'num': Numerator >> eps]
+        }
+    }
+
+
+    @Test
+    public void testDefs() throws Exception {
+        use(Redberry) {
+            Setup stp = new Setup(false, true)
+//            println getVector(stp, 'charm', 'x')
+//            println getVector(stp, 'charm', 'y')
+//            println getVector(stp, 'charm', 'z')
+
+            println getVector(stp, 'bottom', 'x')
+            println getVector(stp, 'bottom', 'y')
+            println getVector(stp, 'bottom', 'z')
+        }
+    }
+
+    @Test
+    public void testDefsCC() throws Exception {
+        use(Redberry) {
+            println bind(['k_i[h]': 'p_j+f_j'])
+        }
+    }
 //    @Test
 //    public void testPolarizations1() throws Exception {
 //        //gluon polarizations
