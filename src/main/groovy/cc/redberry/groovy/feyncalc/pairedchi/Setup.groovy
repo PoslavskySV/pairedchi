@@ -23,6 +23,7 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
+import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.number.Complex
 import cc.redberry.core.tensor.*
 import cc.redberry.core.transformations.Transformation
@@ -77,7 +78,7 @@ class Setup implements AutoCloseable {
 
     /** Transformations */
     public def mandelstam, massesSubs, momentums,
-               dTrace, dTraceSimplify, dSimplify, uTrace, uSimplify, leviSimplify,
+               dTrace, dTraceSimplify, diracSimplify, spinorsSimplify, uTrace, uSimplify, leviSimplify,
                simplifyMetrics, fullSimplify, fullSimplifyE,
                conjugateSpinors, momentumConservation
 
@@ -119,6 +120,7 @@ class Setup implements AutoCloseable {
                     'V_iA', Matrix1.matrix, Matrix2.matrix, //quark-gluon vertex
                     'D[p_m, mass]', Matrix1.matrix //quark propagator
 
+            CC.defaultOutputFormat = OutputFormat.Redberry
             //Levi-Civita, SU(N) symmetric and structure tensors
             Quiet { setAntiSymmetric 'e_abcd' }
             Quiet { setSymmetric 'd_ABC' }
@@ -327,22 +329,11 @@ class Setup implements AutoCloseable {
                     leviSimplify &
                     ExpandTensors[simplifyMetrics] & simplifyMetrics
 
-            dTraceSimplify = DiracTrace[[Gamma: 'G_a', Gamma5: 'G5', Simplifications: fullSimplify]]
-
-            dSimplify = Identity
-            dSimplify &= 'G_a*G^a = 4'.t & 'G_a*G_b*G^a = -2*G_b'.t & 'G_a*G_b*G_c*G^a = 4*g_bc'.t
-            dSimplify &= 'G_a*G_b*eps^ab[h[charm]] = 0'.t & 'G_a*G_b*eps^ab[h[bottom]] = 0'.t
-            def momentums
-            if (projectCC)
-                momentums = ['p_i[bottom]', 'p_i[charm]', 'k1_i', 'k2_i'].t
-            else
-                momentums = ['p_i[bottom]', 'p1_i[charm]', 'p2_i[charm]', 'k1_i', 'k2_i'].t
-            momentums.each {
-                def a = it
-                def b = '{_i -> _j}'.mapping >> a
-                def c = '{_i -> ^i}'.mapping >> a
-                dSimplify &= mandelstam >> "G^i * G^j * $a * $b = $a * $c".t
-            }
+            dTraceSimplify = DiracTrace[[Simplifications: fullSimplify]]
+            diracSimplify = DiracSimplify[[Simplifications: simplifyMetrics]]
+            spinorsSimplify = Identity
+            spinorsSimplify &= SpinorsSimplify[[uBar: 'cu[p1_m[charm]]'.t, momentum: 'p1_m[charm]', mass: 'mc']]
+            spinorsSimplify &= SpinorsSimplify[[v: 'v[p2_m[charm]]'.t, momentum: 'p2_m[charm]', mass: 'mc']]
 
             if (projectCC)
                 momentumConservation = 'p_i[bottom] = k1_i + k2_i - p_i[charm]'.t.hold
@@ -522,8 +513,16 @@ class Setup implements AutoCloseable {
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
 
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G5*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G5*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
 
 
             spinorStructuresVars = []
@@ -542,6 +541,7 @@ class Setup implements AutoCloseable {
             conjugate &= '{i -> a, j -> b, A -> C, B -> D}'.mapping
             conjugate &= Reverse[Matrix1, Matrix2]
             conjugate &= conjugateSpinors
+            conjugate &= 'G5 = -G5'.t
 
             for (int i = 0; i < subs.size(); ++i)
                 for (int j = 0; j < subs.size(); ++j) {
@@ -572,19 +572,19 @@ class Setup implements AutoCloseable {
             def num = Numerator >> amp
             num <<= polarizations & fullSimplifyE & uTrace & EliminateMetrics & massesSubs
 
+            println 'a'
             //reducing spinor structures
-            num <<= dSimplify
-            num <<= EliminateMetrics & massesSubs
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
+            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
+            num <<= momentumConservation
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & spinorsSimplify & diracSimplify & massesSubs
 
+            println 'b'
             //instead of fullSimplifyE
             num <<= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics
             num <<= LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
             num <<= ExpandTensors[simplifyMetrics] & simplifyMetrics
-
-
-            num <<= EliminateMetrics & dSimplify & massesSubs
-            num = Transformation.Util.applyUntilUnchanged(num, 'G5*G_a = -G_a*G5'.t)
+            num <<= massesSubs
 
             //replacing spinor structures
             num <<= spinorStructures
@@ -722,5 +722,14 @@ class Setup implements AutoCloseable {
     static void checkPol(g) {
         if (g != null && g != 1 && g != -1)
             throw new IllegalArgumentException()
+    }
+
+    String tsts(Tensor t) {
+        use(Redberry) {
+            t <<= 's = 1'.t & 't1 = 2'.t & 't2 = 3'.t & 'u1 = 4'.t & 'u2 = 5'.t &
+                    'g = 1'.t & 'mc = 1'.t & 'mb = 2'.t &
+                    'm[charm] = 1'.t.hold & 'm[bottom] = 2'.t.hold
+            return t
+        }
     }
 }
