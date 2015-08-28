@@ -104,8 +104,8 @@ class SetupCCTest {
             def bottomSpin = 'scalar'
             def diags = stp.diagrams(bottomSpin)
 
-            for (def g1 in [1])
-                for (def g2 in [1]) {
+            for (def g1 in [-1, 1])
+                for (def g2 in [-1, 1]) {
 
                     def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss${g1}${g2}.redberry")
                     file.delete()

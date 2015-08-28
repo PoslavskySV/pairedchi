@@ -569,8 +569,12 @@ class Setup implements AutoCloseable {
             assert isSymbolic(den)
 
             //processing numerator
+            def fsE= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
+                    LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]] &
+                    ExpandTensors[simplifyMetrics] & simplifyMetrics
+
             def num = Numerator >> amp
-            num <<= polarizations & fullSimplifyE & uTrace & EliminateMetrics & massesSubs
+            num <<= polarizations & fsE & uTrace & EliminateMetrics & massesSubs
 
             println 'a'
             //reducing spinor structures
@@ -581,10 +585,7 @@ class Setup implements AutoCloseable {
 
             println 'b'
             //instead of fullSimplifyE
-            num <<= simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics
-            num <<= LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
-            num <<= ExpandTensors[simplifyMetrics] & simplifyMetrics
-            num <<= massesSubs
+            num <<= fsE
 
             //replacing spinor structures
             num <<= spinorStructures
