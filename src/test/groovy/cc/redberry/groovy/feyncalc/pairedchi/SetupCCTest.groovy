@@ -23,6 +23,7 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
+import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
 import cc.redberry.groovy.Redberry
 import org.junit.Ignore
@@ -37,6 +38,87 @@ import static cc.redberry.groovy.RedberryStatic.*
  * Created by poslavsky on 03/04/15.
  */
 class SetupCCTest {
+    @Test
+    public void testBB() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+
+            def v = 'I*Ascalar_{dD bB}[bottom, -k1_i, k2_i]*mb*2*s**2*/g**2'.t
+            v <<= stp.effectiveQuarkoniaVertices()['scalar']
+            v <<= stp.fullSimplify & stp.massesSubs & stp.wFactor
+            println v
+
+            //-2*(4*mb**2+s)**2*g_{BD}*k2_{b}*k2_{d}-2*(32*mb**4-8*s*mb**2-s**2)*k1_{b}*g_{BD}*k2_{d}-2*(4*mb**2+s)**2*g**2*k1_{b}*k1_{d}*g_{BD}+2*(8*mb**2+s)*k1_{d}*g_{BD}*k2_{b}+(48*mb**4-4*s*mb**2-s**2)*g_{BD}*g_{db}
+            def diag = 'eps1^a[h1] * eps2^b[h2] * B_{aA bB}[charm, k1_i, k2_i - p_i[bottom]]'.t
+
+            def g1 = 1, g2 = -1
+            def pol = stp.setupPolarisations(g1, g2)
+            def M2 = stp.calcProcess([diag], pol)
+            M2 <<= 'g=1'.t &
+                    's=900'.t &
+                    'mc=15/10'.t &
+                    'mb=45/10'.t &
+                    't1=-684064/1000'.t &
+                    't2=-110326/1000'.t &
+                    'u1=-434806/100000'.t &
+                    'u2=-499842/10000'.t
+
+            println M2
+        }
+    }
+
+    @Test
+    public void testCalc_Sign() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def bottomSpin = 'scalar'
+            def diags = stp.diagrams(bottomSpin) & (J = s)
+            println diags.size()
+            def g1 = 1, g2 = -1
+            def results = []
+            def pol = stp.setupPolarisations(g1, g2)
+
+            for (def diag in diags) {
+                def M2 = stp.calcProcess([diag], pol)
+                M2 <<= 'g=1'.t &
+                        's=900'.t &
+                        'mc=15/10'.t &
+                        'mb=45/10'.t &
+                        't1=-684064/1000'.t &
+                        't2=-110326/1000'.t &
+                        'u1=-434806/100000'.t &
+                        'u2=-499842/10000'.t
+                results << M2
+                println M2
+            }
+            stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
+
+            println results
+        }
+    }
+
+    @Test
+    public void testCalc() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def bottomSpin = 'scalar'
+            def diags = stp.diagrams(bottomSpin)
+
+            for (def g1 in [-1, 1])
+                for (def g2 in [-1, 1]) {
+
+                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss${g1}${g2}.redberry")
+                    file.delete()
+
+                    def pol = stp.setupPolarisations(g1, g2)
+                    def M2 = stp.calcProcess(diags, pol)
+                    M2 = M2 / stp.overallPolarizationFactor
+                    file << M2.toString(OutputFormat.Redberry)
+
+                    stp.log "\n\n\n\n\n ******************************  $g1 $g2 done ****************************** \n\n\n\n\n\n\n"
+                }
+        }
+    }
 
     @Test
     public void testWardIdentities() throws Exception {
@@ -48,21 +130,21 @@ class SetupCCTest {
                 def diags_k1 = diags.collect { 'eps1_a[h1] = k1_a'.t >> it }
                 def diags_k2 = diags.collect { 'eps2_a[h2] = k2_a'.t >> it }
 
-                def M2 = '0'.t
                 for (def g2 in [-1, 1]) {
                     def pol = stp.setupPolarisations(1, g2)
-                    M2 += stp.calcProcess(diags_k1, pol)
+                    def M2 = stp.calcProcess(diags_k1, pol)
+                    M2 <<= stp.mapleFactorTr
+                    assert M2 == 0.t
                 }
-                M2 <<= stp.mapleFactorTr
-                assert M2 == 0.t
 
-                M2 = '0'.t
                 for (def g1 in [-1, 1]) {
                     def pol = stp.setupPolarisations(g1, 1)
-                    M2 += stp.calcProcess(diags_k2, pol)
+                    def M2 = stp.calcProcess(diags_k2, pol)
+                    M2 <<= stp.mapleFactorTr
+                    assert M2 == 0.t
                 }
-                M2 <<= stp.mapleFactorTr
-                assert M2 == 0.t
+
+                println "\n\n\n~~~~~~~~~~~~~~~~~~~~~~~~~ Done for $bottomSpin ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\n"
             }
         }
     }
@@ -85,18 +167,21 @@ class SetupCCTest {
         use(Redberry) {
             SetupCC stp = new SetupCC()
             def bottomSpin = 'scalar'
-
             def diags = stp.diagrams(bottomSpin)
-            def diags_k1 = diags.collect { 'eps1_a[h1] = k1_a'.t >> it }
 
-            def M2 = '0'.t
-            for (def g2 in [-1, 1]) {
-                def pol = stp.setupPolarisations(1, g2)
-                M2 += stp.calcProcess(diags_k1, pol)
+            for (def g1 in [1, -1]) {
+                for (def g2 in [1, -1]) {
+                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/ss${g1}${g2}.redberry")
+                    file.delete()
+
+                    def pol = stp.setupPolarisations(g1, g2)
+                    def M2 = stp.calcProcess(diags, pol)
+                    M2 = M2 / stp.overallPolarizationFactor
+                    file << M2.toString(OutputFormat.Redberry)
+
+                    stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
+                }
             }
-            println info(M2)
-            M2 <<= stp.mapleFactorTr
-            assert M2 == 0.t
         }
     }
 
