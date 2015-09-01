@@ -44,6 +44,7 @@ class SetupCC extends Setup {
             def glMa = """eps1^a[h1] * B_{aA cC}[charm, k1_i, k2_i - p_i[bottom]]
                         * G^cd[-k2_i + p_i[bottom]] * g^CD
                         * eps2^b[h2] * A${bottomSpin}_{dD bB}[bottom, -k2_i + p_i[bottom], k2_i]""".t
+
             def glMb = """eps2^b[h2] * B_{bB cC}[charm, k2_i, k1_i - p_i[bottom]]
                         * G^cd[-k1_i + p_i[bottom]] * g^CD
                         * eps1^a[h1] * A${bottomSpin}_{dD aA}[bottom, -k1_i + p_i[bottom], k1_i]""".t

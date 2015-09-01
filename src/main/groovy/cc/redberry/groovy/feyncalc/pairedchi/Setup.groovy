@@ -35,7 +35,8 @@ import com.wolfram.jlink.MathLinkFactory
 
 import static cc.redberry.core.context.OutputFormat.Maple
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
-import static cc.redberry.core.indices.IndexType.*
+import static cc.redberry.core.indices.IndexType.Matrix1
+import static cc.redberry.core.indices.IndexType.Matrix2
 import static cc.redberry.core.utils.TensorUtils.info
 import static cc.redberry.core.utils.TensorUtils.isSymbolic
 import static cc.redberry.groovy.RedberryPhysics.*
@@ -74,7 +75,7 @@ class Setup implements AutoCloseable {
 
     /** Transformations */
     public def mandelstam, massesSubs, momentums,
-               dTrace, dTraceSimplify, dSimplify, uTrace, uSimplify, leviSimplify,
+               dTrace, dTraceSimplify, diracSimplify, spinorsSimplify, uTrace, uSimplify, leviSimplify,
                simplifyMetrics, fullSimplify, fullSimplifyE,
                conjugateSpinors, momentumConservation
 
@@ -329,29 +330,11 @@ class Setup implements AutoCloseable {
                     leviSimplify &
                     ExpandTensors[simplifyMetrics] & simplifyMetrics
 
-            dTraceSimplify = DiracTrace[[Gamma: 'G_a', Gamma5: 'G5', Simplifications: fullSimplify]]
-
-            dSimplify = Identity
-            dSimplify &= 'G_a*G^a = 4'.t & 'G_a*G_b*G^a = -2*G_b'.t & 'G_a*G_b*G_c*G^a = 4*g_bc'.t
-            dSimplify &= 'G_a*G_b*eps^ab[h[charm]] = 0'.t & 'G_a*G_b*eps^ab[h[bottom]] = 0'.t
-            def momentums
-            if (projectCC)
-                momentums = ['p_i[bottom]', 'p_i[charm]', 'k1_i', 'k2_i'].t
-            else
-                momentums = ['p_i[bottom]', 'p1_i[charm]', 'p2_i[charm]', 'k1_i', 'k2_i'].t
-            momentums.each {
-                def a = it
-                def b = '{_i -> _j}'.mapping >> a
-                def c = '{_i -> ^i}'.mapping >> a
-                dSimplify &= mandelstam >> "G^i * G^j * $a * $b = $a * $c".t
-            }
-
-            if (!projectCC) {
-                dSimplify &= 'cu[p1_m[charm]]*G_i*p1^i[charm] = cu[p1_m[charm]]*m[charm]'.t
-                dSimplify &= 'cu[p1_m[charm]]*G5*G_i*p1^i[charm] = -cu[p1_m[charm]]*G5*m[charm]'.t
-                dSimplify &= 'G_i*p2^i[charm]*v[p2^i[charm]] = -m[charm]*v[p2^i[charm]]'.t
-                dSimplify &= 'G_i*p2^i[charm]*G5*v[p2^i[charm]] = m[charm]*G5*v[p2^i[charm]]'.t
-            }
+            dTraceSimplify = DiracTrace[[Simplifications: fullSimplify]]
+            diracSimplify = DiracSimplify[[Simplifications: simplifyMetrics]]
+            spinorsSimplify = Identity
+            spinorsSimplify &= SpinorsSimplify[[uBar: 'cu[p1_m[charm]]'.t, momentum: 'p1_m[charm]', mass: 'mc']]
+            spinorsSimplify &= SpinorsSimplify[[v: 'v[p2_m[charm]]'.t, momentum: 'p2_m[charm]', mass: 'mc']]
 
             if (projectCC)
                 momentumConservation = 'p_i[bottom] = k1_i + k2_i - p_i[charm]'.t.hold
@@ -589,30 +572,33 @@ class Setup implements AutoCloseable {
             def subs = []
             subs << 'cu[p1_m[charm]]*g_AB*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G5*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*g_AB*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G5*g_AB*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G5*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*G5*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G^j*g_AB*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G^j*G5*g_AB*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*G^j*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
-
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
-
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
-
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
 
             spinorStructuresVars = []
             conjugateSpinorL = Identity
             for (int i = 0; i < subs.size(); ++i) {
                 def l = "L${i + 1}${subs[i].indices.free}".t
-                findIndicesSymmetries('_AB'.si, subs[i]).each {
-                    Tensors.addSymmetry(l, LatinUpper, it)
-                }
                 subs[i] = subs[i].eq l
                 spinorStructuresVars << l
                 conjugateSpinorL &= "$l = c$l".t
@@ -625,6 +611,7 @@ class Setup implements AutoCloseable {
             conjugate &= '{i -> a, j -> b, A -> C, B -> D}'.mapping
             conjugate &= Reverse[Matrix1, Matrix2]
             conjugate &= conjugateSpinors
+            conjugate &= 'G5 = -G5'.t
 
             for (int i = 0; i < subs.size(); ++i)
                 for (int j = 0; j < subs.size(); ++j) {
@@ -651,40 +638,31 @@ class Setup implements AutoCloseable {
             den <<= ExpandAndEliminate & mandelstam & mandelstam & massesSubs & wFactor
             assert isSymbolic(den)
 
-            def ls = LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
+            //processing numerator
             def fsE = simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
-                    ls &
+                    LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]] &
                     ExpandTensors[simplifyMetrics] & simplifyMetrics
 
-            //processing numerator
             def num = Numerator >> amp
             num <<= polarizations & fsE & uTrace & EliminateMetrics & massesSubs
 
+            println 'a'
             //reducing spinor structures
-            num <<= dSimplify
-            num <<= EliminateMetrics & massesSubs
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
 
+//            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
+            num <<= momentumConservation
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & spinorsSimplify & diracSimplify & massesSubs
+            num <<= 'I*f_ABC*T^C = T_A*T_B - T_B*T_A'.t
+            num <<= 'd_ABC*T^C = T_A*T_B + T_B*T_A - g_AB/3'.t
+
+            println 'b'
             //instead of fullSimplifyE
             num <<= fsE
 
-            num <<= EliminateMetrics & dSimplify & massesSubs
-            num = Transformation.Util.applyUntilUnchanged(num, 'G5*G_a = -G_a*G5'.t)
-
-            def reduceSpinorStructs = momentumConservation & ExpandTensors[simplifyMetrics] &
-                    simplifyMetrics & ls & dSimplify & massesSubs &
-                    'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t &
-                    'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t &
-                    ExpandTensors[simplifyMetrics] & simplifyMetrics & ls &
-                    dSimplify & massesSubs & mFactor
-
-            log 'Reducing spinor structures ...'
-            num <<= reduceSpinorStructs & 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
-            log 'Reducing spinor structures ... done'
             //replacing spinor structures
             num <<= spinorStructures
             num <<= Collect[*spinorStructuresVars, wFactor, [ExpandSymbolic: false]]
-
             log "Amplitude (numerator) info: ${info(num)}"
             //num.each { println it.dataSubProduct }
             return num / den
@@ -818,5 +796,14 @@ class Setup implements AutoCloseable {
     static void checkPol(g) {
         if (g != null && g != 1 && g != -1)
             throw new IllegalArgumentException()
+    }
+
+    String tsts(Tensor t) {
+        use(Redberry) {
+            t <<= 's = 1'.t & 't1 = 2'.t & 't2 = 3'.t & 'u1 = 4'.t & 'u2 = 5'.t &
+                    'g = 1'.t & 'mc = 1'.t & 'mb = 2'.t &
+                    'm[charm] = 1'.t.hold & 'm[bottom] = 2'.t.hold
+            return t
+        }
     }
 }

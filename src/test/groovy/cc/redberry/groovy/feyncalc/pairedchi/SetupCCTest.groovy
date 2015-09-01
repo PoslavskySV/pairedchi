@@ -23,6 +23,7 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.CC
+import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.Tensor
 import cc.redberry.core.transformations.Transformation
@@ -42,6 +43,59 @@ import static cc.redberry.groovy.RedberryStatic.*
 class SetupCCTest {
 
     @Test
+    public void testCalc_Sign() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def bottomSpin = 'scalar'
+            def diags = stp.diagrams(bottomSpin) & (J = s)
+            println diags.size()
+            def g1 = 1, g2 = -1
+            def results = []
+            def pol = stp.setupPolarisations(g1, g2)
+
+            for (def diag in diags) {
+                def M2 = stp.calcProcess([diag], pol)
+                M2 <<= 'g=1'.t &
+                        's=900'.t &
+                        'mc=15/10'.t &
+                        'mb=45/10'.t &
+                        't1=-684064/1000'.t &
+                        't2=-110326/1000'.t &
+                        'u1=-434806/100000'.t &
+                        'u2=-499842/10000'.t
+                results << M2
+                println M2
+            }
+            stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
+
+            println results
+        }
+    }
+
+    @Test
+    public void testCalc() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def bottomSpin = 'scalar'
+            def diags = stp.diagrams(bottomSpin)
+
+            for (def g1 in [1, -1])
+                for (def g2 in [1, -1]) {
+
+                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss${g1}${g2}.redberry")
+                    file.delete()
+
+                    def pol = stp.setupPolarisations(g1, g2)
+                    def M2 = stp.calcProcess(diags, pol)
+                    M2 = M2 / stp.overallPolarizationFactor
+                    file << M2.toString(OutputFormat.Redberry)
+
+                    stp.log "\n\n\n\n\n ******************************  $g1 $g2 done ****************************** \n\n\n\n\n\n\n"
+                }
+        }
+    }
+
+    @Test
     public void testWardIdentities() throws Exception {
         use(Redberry) {
             SetupCC stp = new SetupCC()
@@ -51,21 +105,21 @@ class SetupCCTest {
                 def diags_k1 = diags.collect { 'eps1_a[h1] = k1_a'.t >> it }
                 def diags_k2 = diags.collect { 'eps2_a[h2] = k2_a'.t >> it }
 
-                def M2 = '0'.t
                 for (def g2 in [-1, 1]) {
                     def pol = stp.setupPolarisations(1, g2)
-                    M2 += stp.calcProcess(diags_k1, pol)
+                    def M2 = stp.calcProcess(diags_k1, pol)
+                    M2 <<= stp.mapleFactorTr
+                    assert M2 == 0.t
                 }
-                M2 <<= stp.mapleFactorTr
-                assert M2 == 0.t
 
-                M2 = '0'.t
                 for (def g1 in [-1, 1]) {
                     def pol = stp.setupPolarisations(g1, 1)
-                    M2 += stp.calcProcess(diags_k2, pol)
+                    def M2 = stp.calcProcess(diags_k2, pol)
+                    M2 <<= stp.mapleFactorTr
+                    assert M2 == 0.t
                 }
-                M2 <<= stp.mapleFactorTr
-                assert M2 == 0.t
+
+                println "\n\n\n~~~~~~~~~~~~~~~~~~~~~~~~~ Done for $bottomSpin ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\n"
             }
         }
     }
@@ -88,18 +142,21 @@ class SetupCCTest {
         use(Redberry) {
             SetupCC stp = new SetupCC()
             def bottomSpin = 'scalar'
-
             def diags = stp.diagrams(bottomSpin)
-            def diags_k1 = diags.collect { 'eps1_a[h1] = k1_a'.t >> it }
 
-            def M2 = '0'.t
-            for (def g2 in [-1, 1]) {
-                def pol = stp.setupPolarisations(1, g2)
-                M2 += stp.calcProcess(diags_k1, pol)
+            for (def g1 in [1, -1]) {
+                for (def g2 in [1, -1]) {
+                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/ss${g1}${g2}.redberry")
+                    file.delete()
+
+                    def pol = stp.setupPolarisations(g1, g2)
+                    def M2 = stp.calcProcess(diags, pol)
+                    M2 = M2 / stp.overallPolarizationFactor
+                    file << M2.toString(OutputFormat.Redberry)
+
+                    stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
+                }
             }
-            println info(M2)
-            M2 <<= stp.mapleFactorTr
-            assert M2 == 0.t
         }
     }
 
@@ -112,112 +169,6 @@ class SetupCCTest {
             t2 <<= stp.leviSimplify & stp.fullSimplify & stp.massesSubs & stp.mFactor
             println t2
         }
-
-    }
-
-    @Test
-    public void testzx() throws Exception {
-        use(Redberry) {
-            setAntiSymmetric 'e_abcd'
-            def t = 'L7^{b}_{BA}*e^{dn}_{ab}*k1_{d}*k2^{a}*p1_{n}[charm] + L7^{b}_{BA}*e^{dn}_{ab}*k1^{a}*k2_{n}*p1_{d}[charm]'.t
-            println t
-        }
-    }
-
-    @Test
-    public void testPll() throws Exception {
-        use(Redberry) {
-            //15679
-//G_{a}^{b'}_{c'}*G^{da'}_{b'}*cu_{a'A'}[p1_{m}[charm]]*T_{A}^{A'}_{B'}*T_{B}^{B'}_{C'}*v^{c'C'}[p2_{m}[charm]]*k1^{j}*p1^{e}[charm]*k2^{f}*e^{a}_{jfe}*p2_{d}[charm]
-
-            //addSymmetry 'L10_{baAB}', IndexType.LatinUpper, -[[0, 1]].p
-            //cu Gp2
-
-            def freeQ = { Tensor expr, Tensor patt ->
-                expr.parentAfterChild {
-                    if ((patt % it).exists || (it % patt).exists)
-                        return false
-                }
-                return true
-            }
-            Setup stp = new Setup(false, true)
-            println 'L1_AB - L1_BA'.t
-
-            def expr
-            new File('/Users/poslavsky/Downloads/amp0').eachLine {
-                expr = it.t
-            }
-            expr = expr.dataSubProduct
-
-            expr <<= stp.spinorStructures.transpose()
-            expr <<= ExpandTensors & EliminateMetrics
-            println info(expr)
-
-            def reduceSpinorStructs = stp.momentumConservation & ExpandTensors[stp.simplifyMetrics] &
-                    stp.simplifyMetrics & stp.leviSimplify & stp.dSimplify & stp.massesSubs &
-                    'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t & 'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t &
-                    'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t & 'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t &
-                    'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t & 'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t &
-                    'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t & 'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t &
-                    ExpandTensors[stp.simplifyMetrics] & stp.simplifyMetrics & stp.leviSimplify &
-                    stp.dSimplify & stp.massesSubs & stp.mFactor
-
-            expr <<= reduceSpinorStructs
-            println info(expr)
-//            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
-            def s1 = 'k2^a*L10_{abAB} = -k2^a*L10_{baAB} + k2_b*L2_AB'.t
-            def s2 = 'k1^a*L10_{abAB} = -k1^a*L10_{baAB} + k1_b*L2_AB'.t
-
-
-            expr <<= stp.spinorStructures
-//            expr<<= s1 & s2
-
-            expr = Transformation.Util.applySequentially(expr, s1 & s2 & ExpandTensors[EliminateMetrics] & EliminateMetrics)
-            expr <<= reduceSpinorStructs
-//            expr <<=  &
-//                    s1 & s2 & reduceSpinorStructs
-            println info(expr)
-
-//
-////            dSimplify &= 'cu[p1_m[charm]]*G_i*p1^i[charm] = cu[p1_m[charm]]*m[charm]'.t
-////            dSimplify &= 'cu[p1_m[charm]]*G5*G_i*p1^i[charm] = -cu[p1_m[charm]]*G5*m[charm]'.t
-////            dSimplify &= 'G_i*p2^i[charm]*v[p2^i[charm]] = -m[charm]*v[p2^i[charm]]'.t
-////            dSimplify &= 'G_i*p2^i[charm]*G5*v[p2^i[charm]] = m[charm]*G5*v[p2^i[charm]]'.t
-//            def tr1 = 'G_b*G_a*p1^a[charm] = 2*p1_b[charm] - G_a*G_b*p1^a[charm]'.t
-//            def tr2 = 'G_a*G_b*p2^a[charm] = 2*p2_b[charm] - G_b*G_a*p2^a[charm]'.t
-//
-//            expr <<= tr1 & tr2 & ExpandTensors[EliminateMetrics] & EliminateMetrics & stp.leviSimplify & stp.dSimplify & stp.massesSubs & stp.mFactor
-
-            def mm = 'e_abcd * k1^a * k2^b * p1^c[charm] * p2^d[charm] = eklmn'.t
-            expr <<= mm
-            expr <<= stp.spinorStructures
-            println info(expr)
-
-            //k1, k2, p1, p2, p
-            expr.each {
-//                if (!freeQ(it, 'p2_{b}[charm]'.t))
-                println it.indexlessSubProduct.toString(WolframMathematica)
-            }
-            //e_abcd * k1^a * k2^b * p1^c * p2^d
-
-            //G5^{a'}_{e'}*cu_{a'A'}[p1_{m}]*v^{e'B'}[p2^{i}]*T_{B}^{A'}_{D'}*T_{A}^{D'}_{B'}
-            //G5^{a'}_{b'}*cu_{a'A'}[p1_{m}]*v^{b'B'}[p2_{m}]*T_{A}^{A'}_{C'}*T_{B}^{C'}_{B'}
-
-            //cu G5 T_A T_B v
-
-//            expr <<= subs
-//            println info(expr)
-
-//            expr <<= stp.dSimplify
-
-//            L10_{baAB}*k1^{a}*k1^{j}*k2^{f}*e^{b}_{jfe}*p2^{e}[charm]
-//            L10_{baBA}*k1^{a}*k1^{j}*k2^{f}*e^{b}_{jfe}*p2^{e}[charm]
-//
-//            L10_{abBA}*k1^{j}*k2^{b}*k2^{f}*e^{a}_{jfe}*p2^{e}[charm]
-//
-//            L10_{baAB}*k1^{j}*k2^{a}*k2^{f}*e^{b}_{jfe}*p2^{e}[charm]
-        }
-
     }
 
     @Test
