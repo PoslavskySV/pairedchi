@@ -89,8 +89,6 @@ class SetupCC extends Setup {
             diagrams = diagrams.collect({ it << (gcc & EliminateMetrics) })
             log '... done'
             return diagrams
-//            return [glMa]
-
         }
     }
 
