@@ -120,7 +120,6 @@ class Setup implements AutoCloseable {
                     'V_iA', Matrix1.matrix, Matrix2.matrix, //quark-gluon vertex
                     'D[p_m, mass]', Matrix1.matrix //quark propagator
 
-            CC.defaultOutputFormat = OutputFormat.Redberry
             //Levi-Civita, SU(N) symmetric and structure tensors
             Quiet { setAntiSymmetric 'e_abcd' }
             Quiet { setSymmetric 'd_ABC' }
@@ -504,26 +503,28 @@ class Setup implements AutoCloseable {
             def subs = []
             subs << 'cu[p1_m[charm]]*g_AB*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*g_AB*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G5*g_AB*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G5*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*T_A*T_B*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G5*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*G5*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G^j*g_AB*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*G^i*G^j*G5*g_AB*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
+
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*G^j*v[p2_m[charm]]'.t
             subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
-
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G5*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
-            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
-
+//            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
 
             spinorStructuresVars = []
             conjugateSpinorL = Identity
@@ -579,9 +580,12 @@ class Setup implements AutoCloseable {
             println 'a'
             //reducing spinor structures
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
-            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
+
+//            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
             num <<= momentumConservation
             num <<= ExpandTensorsAndEliminate & simplifyMetrics & spinorsSimplify & diracSimplify & massesSubs
+            num <<= 'I*f_ABC*T^C = T_A*T_B - T_B*T_A'.t
+            num <<= 'd_ABC*T^C = T_A*T_B + T_B*T_A - g_AB/3'.t
 
             println 'b'
             //instead of fullSimplifyE
