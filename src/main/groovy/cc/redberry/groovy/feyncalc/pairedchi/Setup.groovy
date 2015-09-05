@@ -530,9 +530,12 @@ class Setup implements AutoCloseable {
                       'eps0_a * eps0^a = -1'.t]
             eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
                     ExpandAndEliminate & mandelstam & massesSubs) >> eq
+            def extPath = '/Applications/Mathematica.app/Contents/MacOS'
+            if (os().equals('linux'))
+                extPath = '/home/r/bin'
             def solverOptions = [ExternalSolver: [
                     Solver: 'Mathematica',
-                    Path  : (os() == 'linux' ? '/home/r/bin' : '/Applications/Mathematica.app/Contents/MacOS')]]
+                    Path  : extPath]]
             def solutions = Reduce(eq,
                     ["${var}1", "${var}2", "${var}3", "${var}4", "${var}5", "${var}6"].t,
                     solverOptions)
@@ -681,8 +684,8 @@ class Setup implements AutoCloseable {
             num <<= 'I*e_abcd*G^d = -G5*G_a*G_b*G_c + g_ab*G5*G_c-g_ac*G5*G_b+g_bc*G5*G_a'.t
 //            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
             num <<= momentumConservation
-            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
-            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls & massesSubs
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls & massesSubs
             num <<= 'I*f_ABC*T^C = T_A*T_B - T_B*T_A'.t
             num <<= 'd_ABC*T^C = T_A*T_B + T_B*T_A - g_AB/3'.t
 
@@ -696,7 +699,7 @@ class Setup implements AutoCloseable {
             num <<= Expand >> 'eps_ab[h[bottom]]*k1^a*k1^b = -eps_ab[h[bottom]]*(k2^a+p1^a[charm]+p2^a[charm])*(k2^b+p1^b[charm]+p2^b[charm])'.t
             num <<= Expand >> 'eps_ab[h[bottom]]*k1^a = -eps_ab[h[bottom]]*(k2^a+p1^a[charm]+p2^a[charm])'.t
             num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
-            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls & massesSubs
 
             println 'd'
             num <<= fsE
