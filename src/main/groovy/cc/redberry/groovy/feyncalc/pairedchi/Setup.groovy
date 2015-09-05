@@ -531,7 +531,8 @@ class Setup implements AutoCloseable {
             eq = (eps1 & eps2 & eps0 & ExpandAndEliminate & leviSimplify &
                     ExpandAndEliminate & mandelstam & massesSubs) >> eq
             def extPath = '/Applications/Mathematica.app/Contents/MacOS'
-            if (os().equals('linux'))
+            def osstr = os()
+            if (osstr.equals('linux'))
                 extPath = '/home/r/bin'
             def solverOptions = [ExternalSolver: [
                     Solver: 'Mathematica',
