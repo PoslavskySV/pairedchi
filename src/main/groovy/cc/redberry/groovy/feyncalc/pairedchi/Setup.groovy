@@ -532,7 +532,7 @@ class Setup implements AutoCloseable {
                     ExpandAndEliminate & mandelstam & massesSubs) >> eq
             def solverOptions = [ExternalSolver: [
                     Solver: 'Mathematica',
-                    Path  : '/Applications/Mathematica.app/Contents/MacOS']]
+                    Path  : (os() == 'linux' ? '/home/r/bin' : '/Applications/Mathematica.app/Contents/MacOS')]]
             def solutions = Reduce(eq,
                     ["${var}1", "${var}2", "${var}3", "${var}4", "${var}5", "${var}6"].t,
                     solverOptions)
