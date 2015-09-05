@@ -54,6 +54,7 @@ class Setup implements AutoCloseable {
     final boolean projectCC
     final long startTime
     final boolean log
+    final boolean projectXYZ
 
     /** Feynman rules and auxiliary tensors */
     public def J2, J4, PS, V, D, G, V3, FeynmanRules
@@ -94,10 +95,15 @@ class Setup implements AutoCloseable {
     public Transformation mFactor, mapleFactorTr
 
     public Setup(boolean projectCC) {
-        this(projectCC, false)
+        this(projectCC, false, false)
     }
 
-    public Setup(boolean projectCC, boolean log) {
+    public Setup(boolean projectCC, boolean projectXYZ) {
+        this(projectCC, projectXYZ, false)
+    }
+
+    public Setup(boolean projectCC, boolean projectXYZ, boolean log) {
+        this.projectXYZ = projectXYZ
         this.startTime = System.currentTimeMillis()
         this.log = log
         this.projectCC = projectCC
@@ -257,10 +263,16 @@ class Setup implements AutoCloseable {
                 spinSingletProjector[fl] = "v[p2_m[$fl]]*cu[p1_m[$fl]] = (p2_m[$fl]*G^m - m[$fl]) * epsS_m[$fl] * G^m * (p1_m[$fl]*G^m + m[$fl])".t
 
                 // total spin projection
-                def s = "q_i[$fl]*epsS_j[$fl] = eps_i[hS[$fl]]*eps_j[hL[$fl]]".t
-                totalSpinProjector['scalar'] &= s;
-                totalSpinProjector['axial'] &= s;
-                totalSpinProjector['tensor'] &= s
+                if (projectXYZ) {
+                    def s = "q_i[$fl]*epsS_j[$fl] = eps_i[hS[$fl]]*eps_j[hL[$fl]]".t
+                    totalSpinProjector['scalar'] &= s
+                    totalSpinProjector['axial'] &= s
+                    totalSpinProjector['tensor'] &= s
+                } else {
+                    totalSpinProjector['scalar'] &= "q_i[$fl]*epsS_j[$fl] = -J_ij[p_i[$fl], 2*m[$fl]]".t
+                    totalSpinProjector['axial'] &= "q_i[$fl]*epsS_j[$fl] = e_ijab * p^a[$fl] * eps^b[h[$fl]]".t
+                    totalSpinProjector['tensor'] &= "q_i[$fl]*epsS_j[$fl] = eps_ij[h[$fl]]".t
+                }
 
                 //sum over polarizations for axial meson
                 epsSum &= "eps_a[h[$fl]]*eps_b[h[$fl]] = J_ab[p_a[$fl], 2*m[$fl]]".t
@@ -297,7 +309,6 @@ class Setup implements AutoCloseable {
                 mandelstam = setMandelstam([k1_m: '0', k2_m: '0', 'p_m[charm]': '2*m[charm]', 'p_m[bottom]': '2*m[bottom]'])
             else {
                 mandelstam = setMandelstam5([k1_m: '0', k2_m: '0', 'p1_m[charm]': 'm[charm]', 'p2_m[charm]': 'm[charm]', 'p_m[bottom]': '2*m[bottom]'])
-                mandelstam &= 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
             }
 
             /** Simplifications of polarizations */
@@ -332,6 +343,10 @@ class Setup implements AutoCloseable {
 
             dTraceSimplify = DiracTrace[[Simplifications: fullSimplify]]
             diracSimplify = DiracSimplify[[Simplifications: simplifyMetrics]]
+            diracSimplify &= 'G_a*G_b*eps^ab[h[bottom]] = 0'.t
+            diracSimplify &= 'G_a*G5*G_b*eps^ab[h[bottom]] = 0'.t
+            diracSimplify &= 'G_a*G_c*G_b*eps^ab[h[bottom]] = 2*G_b*eps_c^b[h[bottom]]'.t
+
             spinorsSimplify = Identity
             spinorsSimplify &= SpinorsSimplify[[uBar: 'cu[p1_m[charm]]'.t, momentum: 'p1_m[charm]', mass: 'mc']]
             spinorsSimplify &= SpinorsSimplify[[v: 'v[p2_m[charm]]'.t, momentum: 'p2_m[charm]', mass: 'mc']]
@@ -595,6 +610,15 @@ class Setup implements AutoCloseable {
 //            subs << 'cu[p1_m[charm]]*f_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
 //            subs << 'cu[p1_m[charm]]*d_ABC*T^C*G^i*G^j*v[p2_m[charm]]'.t
 
+            subs << 'cu[p1_m[charm]]*g_AB*G^i*G^j*G5*v[p2_m[charm]]'.t
+            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G5*v[p2_m[charm]]'.t
+
+//            subs << 'cu[p1_m[charm]]*g_AB*G^i*G^j*G^k*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G^k*v[p2_m[charm]]'.t
+//
+//            subs << 'cu[p1_m[charm]]*g_AB*G^i*G^j*G^k*G5*v[p2_m[charm]]'.t
+//            subs << 'cu[p1_m[charm]]*T_A*T_B*G^i*G^j*G^k*G5*v[p2_m[charm]]'.t
+
             spinorStructuresVars = []
             conjugateSpinorL = Identity
             for (int i = 0; i < subs.size(); ++i) {
@@ -608,7 +632,7 @@ class Setup implements AutoCloseable {
             spinorSquares = Identity
 
             def conjugate = Conjugate
-            conjugate &= '{i -> a, j -> b, A -> C, B -> D}'.mapping
+            conjugate &= '{i -> a, j -> b, k -> c, A -> C, B -> D}'.mapping
             conjugate &= Reverse[Matrix1, Matrix2]
             conjugate &= conjugateSpinors
             conjugate &= 'G5 = -G5'.t
@@ -639,25 +663,42 @@ class Setup implements AutoCloseable {
             assert isSymbolic(den)
 
             //processing numerator
+            def ls = LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]]
             def fsE = simplifyMetrics & ExpandTensors[simplifyMetrics] & simplifyMetrics &
-                    LeviCivitaSimplify.minkowski[[OverallSimplifications: ExpandTensors[simplifyMetrics] & simplifyMetrics]] &
-                    ExpandTensors[simplifyMetrics] & simplifyMetrics
+                    ls & ExpandTensors[simplifyMetrics] & simplifyMetrics & massesSubs
 
             def num = Numerator >> amp
+            num <<= 'eps_i[hS[bottom]]*p^i[bottom] = 0'.t
+            num <<= 'eps_i[hL[bottom]]*p^i[bottom] = 0'.t
+            num <<= 'eps_i[h[bottom]]*p^i[bottom] = 0'.t
+            num <<= 'eps_ij[h[bottom]]*p^i[bottom] = 0'.t
             num <<= polarizations & fsE & uTrace & EliminateMetrics & massesSubs
 
             println 'a'
             //reducing spinor structures
-            num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
+//            num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
 
+            num <<= 'I*e_abcd*G^d = -G5*G_a*G_b*G_c + g_ab*G5*G_c-g_ac*G5*G_b+g_bc*G5*G_a'.t
 //            num <<= 'T_A*T_B = 1/6*g_AB + 1/2*(I*f_ABC + d_ABC)*T^C'.t
             num <<= momentumConservation
-            num <<= ExpandTensorsAndEliminate & simplifyMetrics & spinorsSimplify & diracSimplify & massesSubs
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
             num <<= 'I*f_ABC*T^C = T_A*T_B - T_B*T_A'.t
             num <<= 'd_ABC*T^C = T_A*T_B + T_B*T_A - g_AB/3'.t
 
             println 'b'
             //instead of fullSimplifyE
+            num <<= fsE
+
+
+            println 'c'
+            num <<= Expand >> 'eps_a[h[bottom]]*k1^a = -eps_a[h[bottom]]*(k2^a+p1^a[charm]+p2^a[charm])'.t
+            num <<= Expand >> 'eps_ab[h[bottom]]*k1^a*k1^b = -eps_ab[h[bottom]]*(k2^a+p1^a[charm]+p2^a[charm])*(k2^b+p1^b[charm]+p2^b[charm])'.t
+            num <<= Expand >> 'eps_ab[h[bottom]]*k1^a = -eps_ab[h[bottom]]*(k2^a+p1^a[charm]+p2^a[charm])'.t
+            num <<= 'G_a*G_b*G_c = g_ab*G_c-g_ac*G_b+g_bc*G_a-I*e_abcd*G5*G^d'.t
+            num <<= ExpandTensorsAndEliminate & simplifyMetrics & ls & spinorsSimplify & diracSimplify & ls &  massesSubs
+
+            println 'd'
             num <<= fsE
 
             //replacing spinor structures

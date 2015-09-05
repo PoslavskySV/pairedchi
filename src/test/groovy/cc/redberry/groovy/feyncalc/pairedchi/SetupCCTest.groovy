@@ -26,15 +26,13 @@ import cc.redberry.core.context.CC
 import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.Tensor
-import cc.redberry.core.transformations.Transformation
 import cc.redberry.groovy.Redberry
 import org.junit.Ignore
 import org.junit.Test
 
 import static cc.redberry.core.context.OutputFormat.SimpleRedberry
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
-import static cc.redberry.core.tensor.Tensors.setAntiSymmetric
-import static cc.redberry.core.utils.TensorUtils.info
+import static cc.redberry.core.utils.TensorUtils.*
 import static cc.redberry.groovy.RedberryStatic.*
 
 /**
@@ -42,12 +40,116 @@ import static cc.redberry.groovy.RedberryStatic.*
  */
 class SetupCCTest {
 
+    public static Tensor replaceTensors(Map map, Tensor expr0) {
+        use(Redberry) {
+            def expr = (map.collect { "$it.key = $it.value".t }) >>> expr0
+
+            def tts = []
+            expr.parentAfterChild { t ->
+                if (t.class == Product && t.indices.size() != 0)
+                    tts << t.dataSubProduct
+            }
+
+            def var = map.size()
+            for (def ts in tts) {
+                def subs = "$ts = var${var + 1}".t
+                def mod = subs >>> expr
+                if (mod != expr) {
+                    map[ts] = "var${++var}".t
+                    expr = mod
+                }
+            }
+            if (expr == expr0)
+                return expr
+            else return replaceTensors(map, expr)
+        }
+    }
+
+    private static boolean freeQ(Tensor t, Tensor m) {
+        use(Redberry) {
+            t.parentAfterChild {
+                if ((it % m).exists || (m % it).exists)
+                    return false
+            }
+            return true
+        }
+    }
+
+    @Test
+    public void testCalc_Structs() throws Exception {
+        use(Redberry) {
+            SetupCC stp = new SetupCC(true)
+            def bottomSpin = 'tensor'
+            def diags = stp.diagrams(bottomSpin)
+            def qpol = stp.setXYZ('bottom', 'x', 'x')['tr']
+            def pol = stp.setupPolarisations(1, -1)
+
+            def suntr = Identity
+            suntr &= 'L1_AB = L1*g_AB'.t
+            suntr &= 'L2_AB = L1*tt_AB'.t
+            suntr &= 'L3_AB = L3*g_AB'.t
+            suntr &= 'L4_AB = L3*tt_AB'.t
+            suntr &= 'L5^i_AB = L5^i*g_AB'.t
+            suntr &= 'L6^i_AB = L5^i*tt_AB'.t
+            suntr &= 'L7^i_AB = L7^i*g_AB'.t
+            suntr &= 'L8^i_AB = L7^i*tt_AB'.t
+            suntr &= 'L9^ij_AB = L9^ij*g_AB'.t
+            suntr &= 'L10^ij_AB = L10^ij*tt_AB'.t
+            suntr &= 'L11^ij_AB = L11^ij*g_AB'.t
+            suntr &= 'L12^ij_AB = L11^ij*tt_AB'.t
+            suntr &= 'L13^ijk_AB = L13^ijk*g_AB'.t
+            suntr &= 'L14^ijk_AB = L13^ijk*tt_AB'.t
+            suntr &= 'L15^ijk_AB = L15^ijk*g_AB'.t
+            suntr &= 'L16^ijk_AB = L15^ijk*tt_AB'.t
+
+
+            def tot = 0.t
+            def map = [:]
+            for (def diag in diags) {
+                def amp = stp.calcAmplitude(diag, qpol & pol)
+                def num = Numerator >> amp, den = Denominator >> amp
+
+                num = suntr >>> num
+                num <<= ExpandTensorsAndEliminate
+                num <<= 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
+
+                num *= 'f^AB'.t
+                num <<= ExpandTensorsAndEliminate & stp.simplifyMetrics
+                num <<= 'f^A_A = SUNN'.t
+                num <<= 'f^AB*tt_AB = SUNT1'.t
+                num <<= 'f^AB*tt_BA = SUNT2'.t
+                num <<= ExpandTensorsAndEliminate
+                num <<= stp.wFactor
+
+                tot += replaceTensors(map, num) / den
+
+                if (!isSymbolic(tot)) {
+                    tot.parentAfterChild {
+                        if (it.class == Product && it.indices.size() != 0) {
+                            println 'beda \n\n'
+                            println it
+                            println '---beda \n\n'
+                        }
+                    }
+                }
+            }
+
+            println map.size()
+            println '\n\n\n'
+            map.each { k, v ->
+                println "$k   =   $v"
+            }
+            println '\n\n\n'
+            println info(tot)
+        }
+    }
+
     @Test
     public void testCalc_Sign() throws Exception {
         use(Redberry) {
             SetupCC stp = new SetupCC()
             def bottomSpin = 'scalar'
-            def diags = stp.diagrams(bottomSpin) & (J = s)
+            def diags = stp.diagrams(bottomSpin)
             println diags.size()
             def g1 = 1, g2 = -1
             def results = []
@@ -64,11 +166,12 @@ class SetupCCTest {
                         'u1=-434806/100000'.t &
                         'u2=-499842/10000'.t
                 results << M2
-                println M2
+                assert isRealPositiveNumber(M2)
             }
             stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
 
             println results
+
         }
     }
 
@@ -80,7 +183,7 @@ class SetupCCTest {
             def diags = stp.diagrams(bottomSpin)
 
             for (def g1 in [1, -1])
-                for (def g2 in [1, -1]) {
+                for (def g2 in [-1, 1]) {
 
                     def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss${g1}${g2}.redberry")
                     file.delete()
@@ -137,37 +240,24 @@ class SetupCCTest {
         }
     }
 
-    @Test
-    public void testName() throws Exception {
-        use(Redberry) {
-            SetupCC stp = new SetupCC()
-            def bottomSpin = 'scalar'
-            def diags = stp.diagrams(bottomSpin)
-
-            for (def g1 in [1, -1]) {
-                for (def g2 in [1, -1]) {
-                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/ss${g1}${g2}.redberry")
-                    file.delete()
-
-                    def pol = stp.setupPolarisations(g1, g2)
-                    def M2 = stp.calcProcess(diags, pol)
-                    M2 = M2 / stp.overallPolarizationFactor
-                    file << M2.toString(OutputFormat.Redberry)
-
-                    stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
-                }
-            }
-        }
-    }
 
     @Test
-    public void testLevi() throws Exception {
+    public void testXYZWard() throws Exception {
         use(Redberry) {
-            Setup stp = new Setup(false, true)
-            def t = 'e_abcd * k1^a * k2^b * p1^c[charm] * p2^d[charm]'.t
-            def t2 = t * t
-            t2 <<= stp.leviSimplify & stp.fullSimplify & stp.massesSubs & stp.mFactor
-            println t2
+            SetupCC stp = new SetupCC(true)
+            def qXYZ = stp.setXYZ('bottom', 'x', 'y')
+            def pol = stp.setupPolarisations(-1, 1)
+            def qpol = qXYZ['tr']
+
+            def diags = stp.diagrams('scalar')
+//            diags = diags.collect { ('eps1_a[h1] = k1_a'.t) >> it }
+
+            def m2 = stp.calcProcess(diags, pol & qpol)
+            println info(m2)
+
+            m2 <<= stp.mapleFactorTr
+
+            println m2
         }
     }
 
@@ -222,7 +312,7 @@ class SetupCCTest {
 
 
 
-            def m2 = stp.calcProcess(diags.collect {('eps1_a[h1] = k1_a'.t & 'eps2_a[h2] = k2_a'.t) >> it }, qpol)
+            def m2 = stp.calcProcess(diags.collect { ('eps1_a[h1] = k1_a'.t & 'eps2_a[h2] = k2_a'.t) >> it }, qpol)
 
             println info(m2)
             println stp.mapleFactorTr >> m2

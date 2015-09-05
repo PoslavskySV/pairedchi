@@ -34,7 +34,7 @@ import java.util.Map;
  * @author Stanislav Poslavsky
  */
 public class Main {
-    public static Process[] processes = {new RunCC(), new RunChi(), new Convert()};
+    public static Process[] processes = {new RunCC(), new RunChi(), new RunCCXYZ(), new Convert()};
     public static Map<String, Process> processByName = new HashMap<>();
 
     static {

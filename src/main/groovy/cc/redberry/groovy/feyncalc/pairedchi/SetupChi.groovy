@@ -35,7 +35,7 @@ class SetupChi extends Setup {
     def qVertices
 
     SetupChi() {
-        super(true, true);
+        super(true, false, true);
         use(Redberry) {
             qVertices = effectiveQuarkoniaVertices().values().collect({ x -> x << (Together & wFactor) }) as Transformation
         }

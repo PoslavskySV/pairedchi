@@ -72,7 +72,7 @@ class SetupTest {
     @Test
     public void testMathematica() throws Exception {
         use(Redberry) {
-            def stp = new Setup(false, false)
+            def stp = new Setup(false, false, false)
             def t = '(Sin[x]*Sin[y] - Cos[x]*Cos[y])*g_mn + Cos[x+y]*g_mn'.t
             assert stp.mSimplify >> t == 0.t
 
@@ -85,7 +85,7 @@ class SetupTest {
     public void testMaple() throws Exception {
 
         use(Redberry) {
-            def stp = new Setup(false, false)
+            def stp = new Setup(false, false, false)
             def t = 'x**2 - x'.t
             assert stp.mapleFactorTr >> t == 'x*(x - 1)'.t
         }
@@ -95,7 +95,7 @@ class SetupTest {
     @Test
     public void testEffectiveVertex1() throws Exception {
         use(Redberry) {
-            def stp = new Setup(true, true)
+            def stp = new Setup(true, false, true)
             def vertices = stp.effectiveQuarkoniaVertices()
             for (fl in ['charm', 'bottom'])
                 for (spin in ['scalar', 'axial', 'tensor']) {
@@ -265,7 +265,7 @@ class SetupTest {
     @Test
     public void testXYZ() throws Exception {
         use(Redberry) {
-            def stp = new Setup(false, true)
+            def stp = new Setup(false, false, true)
             println stp.setXYZ('bottom', 'z', 'x')
         }
     }

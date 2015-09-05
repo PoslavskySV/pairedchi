@@ -22,7 +22,6 @@
  */
 package cc.redberry.groovy.feyncalc.pairedchi.cli
 
-import cc.redberry.core.context.CC
 import cc.redberry.groovy.Redberry
 import cc.redberry.groovy.feyncalc.pairedchi.SetupCC
 
@@ -37,32 +36,26 @@ import static cc.redberry.groovy.RedberryStatic.*
 class Main1 {
     public static void main(String[] args) {
         use(Redberry) {
+            SetupCC stp = new SetupCC()
+            def bottomSpin = 'scalar'
+            def diags = stp.diagrams(bottomSpin)
+
             for (def S in ['x', 'y', 'z'])
                 for (def L in ['x', 'y', 'z'])
                     for (def eps1 in [1, -1])
                         for (def eps2 in [1, -1]) {
-                            CC.reset()
-                            CC.resetTensorNames(-2907357143612290431)
-
-                            SetupCC stp = new SetupCC()
-                            //axial: 21369 (not projected), 51048 (1, 1)
-                            def bottomSpin = 'scalar'
 
                             def pol = stp.setupPolarisations(eps1, eps2)
-                            def qXYZ = stp.setXYZ('bottom', S, L)
-                            def qpol = qXYZ['tr']
+                            def xyz = stp.setXYZ('bottom', S, L)
+                            def qpol = xyz['tr']
+                            def xyzDenom = xyz['den']
 
-
-                            def diags = stp.diagrams(bottomSpin)
-
-
-                            def i = 0
                             def file = new File("/Users/poslavsky/Downloads/amps_${eps1}_${eps2}_${S}_${L}.txt")
                             file.delete()
                             file << "Gluons factor (inversed):"
                             file << (stp.overallPolarizationFactor**(1 / 2)).toString(WolframMathematica)
                             file << "Bottom factor (inversed):"
-                            file << qXYZ['den'].toString(WolframMathematica)
+                            file << xyz['den'].toString(WolframMathematica)
 
 
                             file << "\n\nMandelstam variables:\n\n"

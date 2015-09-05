@@ -117,7 +117,7 @@ class PolarizationsPlayground {
 
     @Test
     public void testGluonPolarizations() throws Exception {
-        Setup stp = new Setup(false, true)
+        Setup stp = new Setup(false, false, true)
         def gls = gluonPolarizations(stp)
         gls['coeffs'].each {
             println it.toString(OutputFormat.WolframMathematica)
@@ -126,7 +126,7 @@ class PolarizationsPlayground {
 
     @Test
     public void testQuarkoniaPolarizations() throws Exception {
-        Setup stp = new Setup(true, true)
+        Setup stp = new Setup(true, false, true)
         def coeffs = quarkoniaPolarizations(stp, 'charm')['coeffs']
         coeffs.each {
             println "def ${it[0]} = '$it'.t "
@@ -170,7 +170,7 @@ class PolarizationsPlayground {
 
     @Test
     public void test1() throws Exception {
-        Setup stp = new Setup(false, true)
+        Setup stp = new Setup(false, false, true)
         calcCoeffs(stp, 'bottom').each {
             println(it.toString(OutputFormat.WolframMathematica) + ';')
         }
@@ -195,7 +195,7 @@ class PolarizationsPlayground {
     @Test
     public void testDefs() throws Exception {
         use(Redberry) {
-            Setup stp = new Setup(false, true)
+            Setup stp = new Setup(false, false, true)
 //            println getVector(stp, 'charm', 'x')
 //            println getVector(stp, 'charm', 'y')
 //            println getVector(stp, 'charm', 'z')

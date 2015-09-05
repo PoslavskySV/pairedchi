@@ -27,7 +27,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>cc.redberry</groupId>
-    <artifactId>pairedchi</artifactId>
+    <artifactId>redberry-pairedchi</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
@@ -73,7 +73,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>cc.redberry.groovy.feyncalc.pairedchi.cli.Main1</mainClass>
+                            <mainClass>cc.redberry.groovy.feyncalc.pairedchi.cli.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

@@ -23,8 +23,10 @@
 package cc.redberry.groovy.feyncalc.pairedchi
 
 import cc.redberry.core.context.OutputFormat
+import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.Sum
 import cc.redberry.core.tensor.Tensor
+import cc.redberry.core.utils.TensorUtils
 import cc.redberry.groovy.Redberry
 
 import static cc.redberry.groovy.RedberryStatic.*
@@ -33,11 +35,23 @@ import static cc.redberry.groovy.RedberryStatic.*
  * Created by poslavsky on 03/04/15.
  */
 class SetupCC extends Setup {
-    SetupCC() {
-        super(false, true);
+    SetupCC(boolean projectXYZ) {
+        super(false, projectXYZ, true);
     }
 
-    def diagrams(bottomSpin) {
+    SetupCC() {
+        super(false, false, true);
+    }
+
+    def $diagrams = null
+
+    List diagrams(bottomSpin) {
+        if ($diagrams == null)
+            $diagrams = Collections.unmodifiableList(calcDiagrams(bottomSpin))
+        return $diagrams
+    }
+
+    def calcDiagrams(bottomSpin) {
         use(Redberry) {
             def diagrams = []
             //gluon diagrams
@@ -114,6 +128,140 @@ class SetupCC extends Setup {
             def pols = stp.setupPolarisations(g1, g2)
             def M2 = stp.calcProcess(diags, pols)
             output << M2.toString(OutputFormat.Redberry)
+        }
+    }
+
+    public static Tensor replaceTensors(Map map, Tensor expr0) {
+        use(Redberry) {
+            def expr = (map.collect { "$it.key = $it.value".t }) >>> expr0
+
+            def tts = []
+            expr.parentAfterChild { t ->
+                if (t.class == Product && t.indices.size() != 0)
+                    tts << t.dataSubProduct
+            }
+
+            def var = map.size()
+            for (def ts in tts) {
+                def subs = "$ts = var${var + 1}".t
+                def mod = subs >>> expr
+                if (mod != expr) {
+                    map[ts] = "var${++var}".t
+                    expr = mod
+                }
+            }
+            if (expr == expr0)
+                return expr
+            else return replaceTensors(map, expr)
+        }
+    }
+
+    public static void calcXYZ(SetupCC stp, eps1, eps2, S, L, File file, map = [:]) {
+
+        stp.log("""\n\n\n\n\n\n\n\n
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    Parameters:
+    eps1 = $eps1
+    eps1 = $eps1
+    spin S = $S
+    orbital L = $L
+    output = ${file.absolutePath}
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+""")
+
+        use(Redberry) {
+            def xyz = stp.setXYZ('bottom', S, L)
+
+            def stringify = { expr ->
+                if (expr instanceof String) expr = expr.t
+                expr <<= 'p1_a[charm] = p1_a'.t.hold &
+                        'p2_a[charm] = p2_a'.t.hold &
+                        'eps1_a[h1] = eps1_a'.t.hold &
+                        'eps2_a[h2] = eps2_a'.t.hold &
+                        'p_a[bottom] = p_a'.t.hold &
+                        'eps_{a}[h[bottom]] = epsP_a'.t.hold &
+                        'eps_{ab}[h[bottom]] = epsP_ab'.t.hold
+                return expr.toString(OutputFormat.Redberry) + '\n'
+            }
+
+            file << '\n\nGluons factor (inverted):' << '\n'
+            file << stringify(stp.overallPolarizationFactor)
+
+            file << '\n\nBottom factor (inverted):' << '\n'
+            file << stringify(xyz['den'])
+
+            file << '\n\nMandelstam variables:' << '\n'
+            stp.mandelstam.each { file << stringify(it) }
+            def lc = 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
+            file << stringify(lc)
+
+            file << '\n\nSpinor structures:' << '\n'
+            stp.spinorStructures.each { file << stringify(it) }
+
+            def suntr = Identity
+            suntr &= 'L1_AB = L1*g_AB'.t
+            suntr &= 'L2_AB = L1*tt_AB'.t
+            suntr &= 'L3_AB = L3*g_AB'.t
+            suntr &= 'L4_AB = L3*tt_AB'.t
+            suntr &= 'L5^i_AB = L5^i*g_AB'.t
+            suntr &= 'L6^i_AB = L5^i*tt_AB'.t
+            suntr &= 'L7^i_AB = L7^i*g_AB'.t
+            suntr &= 'L8^i_AB = L7^i*tt_AB'.t
+            suntr &= 'L9^ij_AB = L9^ij*g_AB'.t
+            suntr &= 'L10^ij_AB = L10^ij*tt_AB'.t
+            suntr &= 'L11^ij_AB = L11^ij*g_AB'.t
+            suntr &= 'L12^ij_AB = L11^ij*tt_AB'.t
+            suntr &= 'L13^ijk_AB = L13^ijk*g_AB'.t
+            suntr &= 'L14^ijk_AB = L13^ijk*tt_AB'.t
+            suntr &= 'L15^ijk_AB = L15^ijk*g_AB'.t
+            suntr &= 'L16^ijk_AB = L15^ijk*tt_AB'.t
+
+            file << '\n\nSU(N) structures:' << '\n'
+            file << 'g_AB = GAB' << '\n'
+            file << 'T_A*T_B = TAB' << '\n'
+            file << 'T_B*T_A = TBA' << '\n'
+
+
+            def pol = stp.setupPolarisations(eps1, eps2)
+            def qpol = xyz['tr']
+            def diags = stp.diagrams('scalar')
+
+
+            def processed = []
+            diags.eachWithIndex { diag, i ->
+                stp.log "Processing $i-th of amplitude ${diags.size()} total"
+
+                def amp = stp.calcAmplitude(diag, pol & qpol),
+                    num = Numerator >> amp,
+                    den = Denominator >> amp
+
+                //replace SU(N) structures
+                num = suntr >>> num
+                num <<= ExpandTensorsAndEliminate
+                num <<= 'e_abcd*k1^a*k2^b*p1^c[charm]*p2^d[charm] = lc'.t
+                num *= 'f^AB'.t
+                num <<= ExpandTensorsAndEliminate & stp.simplifyMetrics
+                num <<= 'f^A_A = GAB'.t
+                num <<= 'f^AB*tt_AB = TAB'.t
+                num <<= 'f^AB*tt_BA = TBA'.t
+                num <<= ExpandTensorsAndEliminate
+                num = replaceTensors(map, num) / den
+
+                processed << (num / den)
+            }
+
+            file << '\n\nLorentz structures:' << '\n'
+            map.each { k, v -> file << "$v = ${stringify(k)}" }
+
+            file << '\n\nDiagrams:' << '\n'
+            processed.eachWithIndex { p, i -> file << "diag$i = ${stringify(p)}" }
+
+            file << '\n\nTotal amplitude info:' << '\n'
+            file << TensorUtils.info(processed.sum())
         }
     }
 }
