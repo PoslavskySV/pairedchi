@@ -188,6 +188,9 @@ class SetupCC extends Setup {
                 return expr.toString(OutputFormat.Redberry) + '\n'
             }
 
+            file << '\n\nSpin singlet factor:' << '\n'
+            file << '1/2/(2)**(1/2)/mb' << '\n'
+
             file << '\n\nGluons factor (inverted):' << '\n'
             file << stringify(stp.overallPolarizationFactor)
 
@@ -212,7 +215,7 @@ class SetupCC extends Setup {
             suntr &= 'L7^i_AB = L7^i*g_AB'.t
             suntr &= 'L8^i_AB = L7^i*tt_AB'.t
             suntr &= 'L9^ij_AB = L9^ij*g_AB'.t
-            suntr &= 'L10^ij_AB = L10^ij*tt_AB'.t
+            suntr &= 'L10^ij_AB = L9^ij*tt_AB'.t
             suntr &= 'L11^ij_AB = L11^ij*g_AB'.t
             suntr &= 'L12^ij_AB = L11^ij*tt_AB'.t
             suntr &= 'L13^ijk_AB = L13^ijk*g_AB'.t
@@ -249,7 +252,7 @@ class SetupCC extends Setup {
                 num <<= 'f^AB*tt_AB = TAB'.t
                 num <<= 'f^AB*tt_BA = TBA'.t
                 num <<= ExpandTensorsAndEliminate
-                num = replaceTensors(map, num) / den
+                num = replaceTensors(map, num)
 
                 processed << (num / den)
             }

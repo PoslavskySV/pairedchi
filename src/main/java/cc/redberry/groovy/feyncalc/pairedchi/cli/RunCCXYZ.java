@@ -62,7 +62,7 @@ public final class RunCCXYZ implements Process {
         }
     }
 
-    private static final class Encoded {
+    static final class Encoded {
         final int g1, g2;
         final String S, L;
 
@@ -72,9 +72,18 @@ public final class RunCCXYZ implements Process {
             S = s;
             L = l;
         }
+
+
+        @Override
+        public String toString() {
+            return "g1=" + g1 +
+                    " g2=" + g2 +
+                    " S=" + S +
+                    " L=" + L;
+        }
     }
 
-    private static final Encoded[] encodedParams;
+    static final Encoded[] encodedParams;
 
     static {
         encodedParams = new Encoded[36];

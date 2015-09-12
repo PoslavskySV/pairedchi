@@ -26,6 +26,7 @@ import cc.redberry.core.context.CC
 import cc.redberry.core.context.OutputFormat
 import cc.redberry.core.tensor.Product
 import cc.redberry.core.tensor.Tensor
+import cc.redberry.core.utils.THashMap
 import cc.redberry.groovy.Redberry
 import org.junit.Ignore
 import org.junit.Test
@@ -94,7 +95,7 @@ class SetupCCTest {
             suntr &= 'L7^i_AB = L7^i*g_AB'.t
             suntr &= 'L8^i_AB = L7^i*tt_AB'.t
             suntr &= 'L9^ij_AB = L9^ij*g_AB'.t
-            suntr &= 'L10^ij_AB = L10^ij*tt_AB'.t
+            suntr &= 'L10^ij_AB = L9^ij*tt_AB'.t
             suntr &= 'L11^ij_AB = L11^ij*g_AB'.t
             suntr &= 'L12^ij_AB = L11^ij*tt_AB'.t
             suntr &= 'L13^ijk_AB = L13^ijk*g_AB'.t
@@ -158,15 +159,15 @@ class SetupCCTest {
             for (def diag in diags) {
                 def M2 = stp.calcProcess([diag], pol)
                 M2 <<= 'g=1'.t &
-                        's=900'.t &
-                        'mc=15/10'.t &
-                        'mb=45/10'.t &
-                        't1=-684064/1000'.t &
-                        't2=-110326/1000'.t &
-                        'u1=-434806/100000'.t &
-                        'u2=-499842/10000'.t
+                        's=900*x**2'.t &
+                        'mc=15/10*x'.t &
+                        'mb=45/10*x'.t &
+                        't1=-684064/1000*x**2'.t &
+                        't2=-110326/1000*x**2'.t &
+                        'u1=-434806/100000*x**2'.t &
+                        'u2=-499842/10000*x**2'.t
                 results << M2
-                assert isRealPositiveNumber(M2)
+//                assert isRealPositiveNumber(M2)
             }
             stp.log "\n\n\n\n\n ******  $g1 $g2 done ****** \n\n\n\n\n\n\n"
 
@@ -485,6 +486,58 @@ class SetupCCTest {
                 str += ';'
                 println str
             }
+        }
+    }
+
+    @Test
+    public void testX() throws Exception {
+        use(Redberry) {
+            def path = '/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/'
+            def map = new THashMap()
+            for (def i in 0..35) {
+                def f = new File(path + "xyz__$i")
+
+                def st = false
+                for (def line in f.readLines()) {
+                    if (st && (line.startsWith('Diagrams') || line.isEmpty()))
+                        break
+                    else if (line.startsWith('Lorentz structures'))
+                        st = true
+                    else if (st) {
+                        def e = line.t
+                        map[e[1]] = e[0]
+                    }
+                }
+            }
+
+            println map.size()
+
+            map.each { k, v ->
+                println "$k -> $v"
+            }
+        }
+    }
+
+    @Test
+    public void test333() throws Exception {
+        use(Redberry) {
+            def d0 = '(4*mb**2-u2+2*mc**2-s-u1)**(-2)*(var2*((64*I)*TBA*g**4*s**2*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(mc**2-t1)*(-t2*s**2+t2*u2*t1-3*u2*mc**2*t1+mc**2*t1*u1+s*t1*u1+s**2*t1+s*t1**2+2*mc**4*t1+4*t2*mc**2*s-mc**2*t1**2-4*s*t1*mb**2-2*mc**4*u1-t2*s*u1+2*u2*mc**4+3*t2*mc**2*u1-t2*u2*mc**2-2*t2*mc**4-u1*t2**2-s*t2**2+4*t2*s*mb**2-t2*t1*u1-4*mc**2*s*t1+mc**2*t2**2+u2*s*t1-t2*u2*s+u2*t1**2)+(-64*I)*g**4*s**2*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(t2*s**2-t2*u2*t1+3*u2*mc**2*t1-mc**2*t1*u1-s*t1*u1-s**2*t1-s*t1**2-2*mc**4*t1-4*t2*mc**2*s+mc**2*t1**2+4*s*t1*mb**2+2*mc**4*u1+t2*s*u1-2*u2*mc**4-3*t2*mc**2*u1+t2*u2*mc**2+2*t2*mc**4+u1*t2**2+s*t2**2-4*t2*s*mb**2+t2*t1*u1+4*mc**2*s*t1-mc**2*t2**2-u2*s*t1+t2*u2*s-u2*t1**2))+var1*((64*I)*(mc**2*u2**2+t2*s**2+3*u2*mc**2*t1+mc**2*t1*u1+t2*u2*u1-4*s*u1*mb**2+t2*u1**2+4*u2*s*mb**2+2*s*t1*u1-u2**2*s+s**2*t1+4*mc**4*s-u2*t1*u1+2*s**2*u1+s*u1**2-4*mc**2*s**2-u2**2*t1-2*mc**4*t1-2*t2*mc**2*s+2*mc**4*u1+s**3+2*t2*s*u1-2*u2*mc**4-mc**2*u1**2-4*s**2*mb**2-3*t2*mc**2*u1-t2*u2*mc**2+2*t2*mc**4-2*mc**2*s*t1-6*mc**2*s*u1+2*u2*mc**2*s)*g**4*s**2*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2+(-64*I)*TBA*g**4*s**2*(-mc**2*u2**2+t2*s**2-3*u2*mc**2*t1-mc**2*t1*u1-t2*u2*u1+4*s*u1*mb**2-t2*u1**2-4*u2*s*mb**2+u2**2*s+s**2*t1+4*mc**4*s+u2*t1*u1-s*u1**2-4*mc**2*s**2+u2**2*t1+2*mc**4*t1-2*t2*mc**2*s-2*mc**4*u1+s**3+2*u2*mc**4+mc**2*u1**2-4*s**2*mb**2+3*t2*mc**2*u1+t2*u2*mc**2-2*t2*mc**4-2*mc**2*s*t1+2*mc**2*s*u1+2*u2*s**2+2*u2*s*t1+2*t2*u2*s-6*u2*mc**2*s)*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(mc**2-t1))+(128*I)*L1*g**4*s**3*mc*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**3*mb**2+(128*I)*TBA*L1*g**4*s**3*mc*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**3*mb**2*(mc**2-t1))*(-t2+mc**2)**(-2)*(mc**2-t1)**(-2)*(-u2+2*mc**2-s-u1)**(-4)'.t
+            def d2 = '((-128*I)*TBA*g**4*s**3*(-t2*u1-s*t1+4*mc**2*s-s*u1-4*mc**4+2*mc**2*t1+2*mc**2*u1-s**2+2*u2*mc**2+4*s*mb**2-t1*u1-t2*u2+2*t2*mc**2-u2*s-u2*t1-t2*s)**3*mb**2+(128*I)*g**4*s**3*TAB*(-t2*u1-s*t1+4*mc**2*s-s*u1-4*mc**4+2*mc**2*t1+2*mc**2*u1-s**2+2*u2*mc**2+4*s*mb**2-t1*u1-t2*u2+2*t2*mc**2-u2*s-u2*t1-t2*s)**3*mb**2)*(4*mb**2-u2+2*mc**2-s-u1)**(-2)*(-t2+4*mb**2-u2+4*mc**2-s-t1-u1)**(-2)*var1*(-u2+2*mc**2-s-u1)**(-4)'.t
+
+            def subs = 'TBA=1'.t &
+                    'TAB=2'.t &
+                    'GAB=1'.t &
+                    'g=1'.t &
+                    's=900*x**2'.t &
+                    'mc=15/10*x'.t &
+                    'mb=45/10*x'.t &
+                    't1=-684064/1000*x**2'.t &
+                    't2=-110326/1000*x**2'.t &
+                    'u1=-434806/100000*x**2'.t &
+                    'u2=-499842/10000*x**2'.t & ExpandAll
+
+            println subs >> d0
+            println subs >> d2
         }
     }
 }
