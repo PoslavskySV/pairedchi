@@ -33,7 +33,8 @@ import org.junit.Test
 
 import static cc.redberry.core.context.OutputFormat.SimpleRedberry
 import static cc.redberry.core.context.OutputFormat.WolframMathematica
-import static cc.redberry.core.utils.TensorUtils.*
+import static cc.redberry.core.utils.TensorUtils.info
+import static cc.redberry.core.utils.TensorUtils.isSymbolic
 import static cc.redberry.groovy.RedberryStatic.*
 
 /**
@@ -179,20 +180,31 @@ class SetupCCTest {
     @Test
     public void testCalc() throws Exception {
         use(Redberry) {
+//            def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss11.redberry")
+//            def expr = file.readLines()[0].replace('r = ','').replace(';','').replace('^','**').t
+//            println expr.class
             SetupCC stp = new SetupCC()
+
             def bottomSpin = 'scalar'
             def diags = stp.diagrams(bottomSpin)
 
-            for (def g1 in [1, -1])
-                for (def g2 in [-1, 1]) {
+            stp.doMapleFactorOnAmp2 = true
+            for (def g1 in [1])
+                for (def g2 in [1]) {
 
-                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp-ss${g1}${g2}.redberry")
+                    def file = new File("/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/tmp2-ss${g1}${g2}.mч")
                     file.delete()
 
                     def pol = stp.setupPolarisations(g1, g2)
                     def M2 = stp.calcProcess(diags, pol)
+                    println M2.class
                     M2 = M2 / stp.overallPolarizationFactor
-                    file << M2.toString(OutputFormat.Redberry)
+                    println M2.class
+
+
+                    file << "r = "
+                    file << M2.toString(OutputFormat.WolframMathematica)
+                    file << ";"
 
                     stp.log "\n\n\n\n\n ******************************  $g1 $g2 done ****************************** \n\n\n\n\n\n\n"
                 }
@@ -489,40 +501,100 @@ class SetupCCTest {
         }
     }
 
+    static Map lStructs0(path) {
+        use(Redberry) {
+            def map = new THashMap()
+            def f = new File(path)
+
+            def st = false
+            for (def line in f.readLines()) {
+                if (st && (line.startsWith('Diagrams') || line.isEmpty()))
+                    break
+                else if (line.startsWith('Lorentz structures'))
+                    st = true
+                else if (st) {
+                    def e = line.t
+                    map[e[1]] = e[0]
+                }
+            }
+            return map
+        }
+    }
+
+    static Map lStructs(path) throws Exception {
+        use(Redberry) {
+            def map = new THashMap()
+            for (def i in 0..35)
+                map.putAll(lStructs0(path + "xyz__$i"))
+            return map
+        }
+    }
+
+    static void replaceFile(file, map = [:]) {
+        file = new File(file)
+        def lines = file.readLines().join('\n')
+        map.each { k, v -> lines = lines.replace(k, v) }
+        file.delete()
+        file << lines
+    }
+
+
     @Test
+    public void printLor() throws Exception {
+        def path = '/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/'
+        def map = lStructs(path)
+        map.each { k, v ->
+            println "$k -> $v"
+        }
+    }
+
+    @Test
+    @Ignore
     public void testX() throws Exception {
         use(Redberry) {
             def path = '/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/'
-            def map = new THashMap()
-            for (def i in 0..35) {
-                def f = new File(path + "xyz__$i")
-
-                def st = false
-                for (def line in f.readLines()) {
-                    if (st && (line.startsWith('Diagrams') || line.isEmpty()))
-                        break
-                    else if (line.startsWith('Lorentz structures'))
-                        st = true
-                    else if (st) {
-                        def e = line.t
-                        map[e[1]] = e[0]
-                    }
-                }
+            def map = lStructs(path)
+            def i = 0
+            map.keySet().each { k ->
+                map[k] = "lor${i++}"
             }
-
-            println map.size()
 
             map.each { k, v ->
                 println "$k -> $v"
+            }
+
+            for (i = 0; i <= 35; ++i) {
+                def lm = lStructs0(path + "xyz__$i")
+//                println lm
+                def repl = [:]
+                lm.keySet().each { k ->
+                    repl[lm[k].toString()] = map[k].toString()
+                }
+                replaceFile(path + "xyz__$i", repl)
+////                println repl
+            }
+
+        }
+    }
+
+    @Test
+    public void testXx() throws Exception {
+        use(Redberry) {
+            def path = '/Users/poslavsky/Projects/redberry/redberry-pairedchi/output/'
+            for (int i = 0; i <= 35; ++i) {
+                println lStructs0(path + "xyz__$i")
+//                def file = new File(path + "xyz__$i")
+//                def lines = file.readLines().join('\n')
+//                println lines.contains('var')
             }
         }
     }
 
     @Test
-    public void test333() throws Exception {
+    public void testz333() throws Exception {
         use(Redberry) {
-            def d0 = '(4*mb**2-u2+2*mc**2-s-u1)**(-2)*(var2*((64*I)*TBA*g**4*s**2*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(mc**2-t1)*(-t2*s**2+t2*u2*t1-3*u2*mc**2*t1+mc**2*t1*u1+s*t1*u1+s**2*t1+s*t1**2+2*mc**4*t1+4*t2*mc**2*s-mc**2*t1**2-4*s*t1*mb**2-2*mc**4*u1-t2*s*u1+2*u2*mc**4+3*t2*mc**2*u1-t2*u2*mc**2-2*t2*mc**4-u1*t2**2-s*t2**2+4*t2*s*mb**2-t2*t1*u1-4*mc**2*s*t1+mc**2*t2**2+u2*s*t1-t2*u2*s+u2*t1**2)+(-64*I)*g**4*s**2*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(t2*s**2-t2*u2*t1+3*u2*mc**2*t1-mc**2*t1*u1-s*t1*u1-s**2*t1-s*t1**2-2*mc**4*t1-4*t2*mc**2*s+mc**2*t1**2+4*s*t1*mb**2+2*mc**4*u1+t2*s*u1-2*u2*mc**4-3*t2*mc**2*u1+t2*u2*mc**2+2*t2*mc**4+u1*t2**2+s*t2**2-4*t2*s*mb**2+t2*t1*u1+4*mc**2*s*t1-mc**2*t2**2-u2*s*t1+t2*u2*s-u2*t1**2))+var1*((64*I)*(mc**2*u2**2+t2*s**2+3*u2*mc**2*t1+mc**2*t1*u1+t2*u2*u1-4*s*u1*mb**2+t2*u1**2+4*u2*s*mb**2+2*s*t1*u1-u2**2*s+s**2*t1+4*mc**4*s-u2*t1*u1+2*s**2*u1+s*u1**2-4*mc**2*s**2-u2**2*t1-2*mc**4*t1-2*t2*mc**2*s+2*mc**4*u1+s**3+2*t2*s*u1-2*u2*mc**4-mc**2*u1**2-4*s**2*mb**2-3*t2*mc**2*u1-t2*u2*mc**2+2*t2*mc**4-2*mc**2*s*t1-6*mc**2*s*u1+2*u2*mc**2*s)*g**4*s**2*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2+(-64*I)*TBA*g**4*s**2*(-mc**2*u2**2+t2*s**2-3*u2*mc**2*t1-mc**2*t1*u1-t2*u2*u1+4*s*u1*mb**2-t2*u1**2-4*u2*s*mb**2+u2**2*s+s**2*t1+4*mc**4*s+u2*t1*u1-s*u1**2-4*mc**2*s**2+u2**2*t1+2*mc**4*t1-2*t2*mc**2*s-2*mc**4*u1+s**3+2*u2*mc**4+mc**2*u1**2-4*s**2*mb**2+3*t2*mc**2*u1+t2*u2*mc**2-2*t2*mc**4-2*mc**2*s*t1+2*mc**2*s*u1+2*u2*s**2+2*u2*s*t1+2*t2*u2*s-6*u2*mc**2*s)*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**2*mb**2*(mc**2-t1))+(128*I)*L1*g**4*s**3*mc*(-t2+mc**2)*TAB*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**3*mb**2+(128*I)*TBA*L1*g**4*s**3*mc*(t2*u1+s*t1-4*mc**2*s+s*u1+4*mc**4-2*mc**2*t1-2*mc**2*u1+s**2-2*u2*mc**2-4*s*mb**2+t1*u1+t2*u2-2*t2*mc**2+u2*s+u2*t1+t2*s)**3*mb**2*(mc**2-t1))*(-t2+mc**2)**(-2)*(mc**2-t1)**(-2)*(-u2+2*mc**2-s-u1)**(-4)'.t
-            def d2 = '((-128*I)*TBA*g**4*s**3*(-t2*u1-s*t1+4*mc**2*s-s*u1-4*mc**4+2*mc**2*t1+2*mc**2*u1-s**2+2*u2*mc**2+4*s*mb**2-t1*u1-t2*u2+2*t2*mc**2-u2*s-u2*t1-t2*s)**3*mb**2+(128*I)*g**4*s**3*TAB*(-t2*u1-s*t1+4*mc**2*s-s*u1-4*mc**4+2*mc**2*t1+2*mc**2*u1-s**2+2*u2*mc**2+4*s*mb**2-t1*u1-t2*u2+2*t2*mc**2-u2*s-u2*t1-t2*s)**3*mb**2)*(4*mb**2-u2+2*mc**2-s-u1)**(-2)*(-t2+4*mb**2-u2+4*mc**2-s-t1-u1)**(-2)*var1*(-u2+2*mc**2-s-u1)**(-4)'.t
+            def d0 = '(4*s*u2+4*s*u1-8*t2*mc**2-16*s*mc**2-8*u1*mc**2+2*u2*u1+4*s**2+2*t1*t2+u2**2-8*u2*mc**2+t1**2+u1**2+4*t1*s+4*t2*s+2*t1*u2+2*t1*u1+t2**2-16*s*mb**2+2*t2*u2-8*t1*mc**2+2*t2*u1+16*mc**4)*mb**2'.t
+            def d2 = 'mb*(2*u2*t1-16*mc**2*s+2*u1*t2+2*t2*u2+2*t2*t1+u1**2-8*mc**2*u2-16*s*mb**2-8*mc**2*t1-8*u1*mc**2+4*u1*s+u2**2+4*s**2+4*s*u2+4*s*t1+16*mc**4+2*u1*u2-8*t2*mc**2+2*u1*t1+t1**2+t2**2+4*t2*s)**(1/2)*((u2*t1-4*mc**2*s+u1*t2+t2*u2-2*mc**2*u2+s**2-4*s*mb**2-2*mc**2*t1-2*u1*mc**2+u1*s+s*u2+s*t1+4*mc**4-2*t2*mc**2+u1*t1+t2*s)*s*(2*u2*t1-16*mc**2*s+2*u1*t2+2*t2*u2+2*t2*t1+u1**2-8*mc**2*u2-16*s*mb**2-8*mc**2*t1-8*u1*mc**2+4*u1*s+u2**2+4*s**2+4*s*u2+4*s*t1+16*mc**4+2*u1*u2-8*t2*mc**2+2*u1*t1+t1**2+t2**2+4*t2*s))**(1/2)'.t
 
             def subs = 'TBA=1'.t &
                     'TAB=2'.t &

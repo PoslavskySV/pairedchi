@@ -722,7 +722,7 @@ class Setup implements AutoCloseable {
                 sb << calcAmplitude(e, polarizations)
             }
             def M = sb.build()//wFactor >> sb.build()
-            return overallPolarizationFactor * squareMatrixElement(M)
+            return squareMatrixElement(M)
         }
     }
 

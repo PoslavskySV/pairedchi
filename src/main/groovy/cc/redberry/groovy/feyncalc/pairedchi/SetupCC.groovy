@@ -223,6 +223,16 @@ class SetupCC extends Setup {
             suntr &= 'L15^ijk_AB = L15^ijk*g_AB'.t
             suntr &= 'L16^ijk_AB = L15^ijk*tt_AB'.t
 
+//            8
+//            k1^{q}*L10_{cq}*k2^{c} -> var7
+//            k1^{f}*L7_{f} -> var6
+//            k1^{f}*L5_{f} -> var2
+//            k1^{c}*L10_{cq}*k2^{q} -> var8
+//            k1^{j}*k2^{f}*L11_{jf} -> var5
+//            L5_{f}*k2^{f} -> var1
+//            L7_{f}*k2^{f} -> var3
+//            k1^{f}*k2^{j}*L11_{jf} -> var4
+
             file << '\n\nSU(N) structures:' << '\n'
             file << 'g_AB = GAB' << '\n'
             file << 'T_A*T_B = TAB' << '\n'
@@ -232,6 +242,7 @@ class SetupCC extends Setup {
             def pol = stp.setupPolarisations(eps1, eps2)
             def qpol = xyz['tr']
             def diags = stp.diagrams('scalar')
+
 
 
             def processed = []
